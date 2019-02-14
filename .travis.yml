@@ -1,0 +1,14 @@
+language: python
+dist: trusty
+python:
+  - "2.7"
+  - "3.6"
+install:
+  - pip install -e .
+  - pip install pytest-cov codecov
+  - pip freeze
+script:
+  - py.test --cov-config=.coveragerc --cov=dirhash tests/
+after_success:
+  - coverage report
+  - codecov
