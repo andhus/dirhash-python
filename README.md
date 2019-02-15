@@ -10,6 +10,11 @@ include/exclude.
 - Multiprocessing for up to [6x speed-up](#performance)
 
 ## Installation
+From PyPI:
+```commandline
+pip install dirhash
+```
+Or directly from source:
 ```commandline
 git clone git@github.com:andhus/dirhash.git
 pip install dirhash/
