@@ -1,5 +1,5 @@
 language: python
-dist: trusty
+dist: xenial
 
 install:
   - pip install tox codecov
@@ -12,7 +12,12 @@ matrix:
     env: TOXENV=py37
 
 script:
-  - tox -e TOXENV
+  - tox
 
 after_success:
-  - codecov -e TOXENV
+  - codecov
+
+notifications:
+  email:
+    on_success: never
+    on_failure: always
