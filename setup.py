@@ -1,6 +1,6 @@
 import io
 import os
-from setuptools import setup
+from setuptools import setup, find_packages
 
 VERSION = '0.1.1'
 
@@ -27,7 +27,8 @@ setup(
         'pathspec>=0.5.9',
         'scandir>=1.9.0;python_version<"3.5"'
     ],
-    packages=['dirhash'],
+    packages=find_packages('src'),
+    package_dir={'': 'src'},
     include_package_data=True,
     entry_points={
         'console_scripts': ['dirhash=dirhash.cli:main'],
