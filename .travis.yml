@@ -1,14 +1,18 @@
 language: python
 dist: trusty
-python:
-  - "2.7"
-  - "3.6"
+
 install:
-  - pip install -e .
-  - pip install pytest-cov codecov
-  - pip freeze
+  - pip install tox codecov
+
+matrix:
+ include:
+  - python: 2.7
+    env: TOXENV=py27
+  - python: 3.7
+    env: TOXENV=py37
+
 script:
-  - py.test --cov-config=.coveragerc --cov=dirhash tests/
+  - tox -e TOXENV
+
 after_success:
-  - coverage report
-  - codecov
+  - codecov -e TOXENV

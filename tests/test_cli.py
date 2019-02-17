@@ -1,6 +1,7 @@
 from __future__ import print_function, division
 
 import os
+import sys
 import shlex
 import subprocess
 
@@ -9,14 +10,22 @@ import dirhash
 import pytest
 
 
+console_script = os.path.join(
+    os.path.dirname(sys.executable),
+    'dirhash'
+)
+
+
 def dirhash_run(argstring, add_env=None):
+    assert os.path.isfile(console_script)
+    assert os.access(console_script, os.X_OK)
     if add_env:
         env = os.environ.copy()
         env.update(add_env)
     else:
         env = None
     process = subprocess.Popen(
-        ['dirhash'] + shlex.split(argstring),
+        [console_script] + shlex.split(argstring),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=env
