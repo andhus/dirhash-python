@@ -101,12 +101,9 @@ This sections suggests a standard for how to compute a single hash value, the
 `DIRHASH`, of a filesystem directory.
 
 ---
-**TL;DR** 
-Data and metadata of files and subdirectories are hashed recursively by any regular 
-hash function. Options are provided for filtering of which 
-files to include as well as which data and metadata to consider for the included 
-files. A fixed set of such options, including the hash function, will under the 
-Dirhash standard generate a deterministic hash value for any directory.
+
+*TL;DR*: Data and metadata of files and subdirectories are hashed recursively by any regular hash function. Options are provided for filtering of which files to include as well as which data and metadata to consider for the included files. A fixed set of such options, including the hash function, will under the Dirhash standard generate a deterministic hash value for any directory.
+
 ---
 
 The standard is designed with the following objectives:
@@ -115,18 +112,11 @@ The standard is designed with the following objectives:
 - *Extendable* - instead of trying to cover all possible use cases. 
 - *Same collision resistance* as underlying hashing algorithm.
 
-The process of computing the `DIRHASH` relies on the concepts below. 
-Each concept is configurable by one or several options, witch 
-(except for "Implementation") *affects the obtained hash value*:
-1. **Hash Function**: The underlying hash function used to map any data to a fixed
-length hash value.
-2. **Filtering**: The process of selecting what *entries* (sub directories and files)
-within the directory to include.
-3. **Protocol**: Defines which data/metadata to include for each entry and precisely 
-how to it is fed to the hash function for a reproducible and collision 
-resistant result.
-4. **Implementation**: Additional, implementation specific, aspects of how the
-`DIRHASH` is programmatically obtained.
+The process of computing the `DIRHASH` relies on the concepts below. Each concept is configurable by one or several options, which *affects the obtained hash value* (except for "Implementation" options):
+1. **Hash Function**: The underlying hash function used to map any data to a fixed length hash value.
+2. **Filtering**: The process of selecting what *entries* (sub directories and files) within the directory to include.
+3. **Protocol**: Defines which data/metadata to include for each entry and precisely  how to it is fed to the hash function for a reproducible and collision resistant result.
+4. **Implementation**: Additional, implementation specific, aspects of how the `DIRHASH` is programmatically obtained.
 
 Since the configuration options for 1-3 above affects the obtained `DIRHASH`, they 
 must be represented in a `DIRHASH`-checksum of a directory.
@@ -141,18 +131,34 @@ Implementation options are naturally not covered by this standard as these *shou
 not affect the obtained* `DIRHASH`. Such options should be clearly distinguished 
 from those in 1-3.
 
-## Algorithm
-TODO naming convention: single string (as per python's hashlib).
+
+
+## Hash Function
+All data and metadata which is the basis for the `DIRHASH` is hashed by a standard hash function. The Dirhash Standard defines precisely how data is fed to the hash function. The hash functions is specified using the single option `algorithm`. The following algorithms are covered in the Dirhash Standard: [`"md5"`](https://www.ietf.org/rfc/rfc1321.txt), [`"sha1"`](https://tools.ietf.org/html/rfc3174), [`"sha224"`, `"sha256"`, `"sha384"`, `"sha512"`](https://tools.ietf.org/html/rfc6234) but can naturally be extended.
+
+
+### Hash function Options
+Name  | Type             | Default             | Description 
+----  | ---------------- | ------------------- | -----------
+algorithm | String | (no default) | The standard hashing algorithm (function) to use. 
+
+
+
 
 ## Filtering
+Mainly matching of file path
+
 
 ### Filtering Options
 Name  | Type             | Default             | Description 
 ----  | ---------------- | ------------------- | -----------
-match | Array of Strings | `["*"]` (match all) | Wildcard matching. Path relative to root directory to hash is matched against the provided patterns. The path must match at least on of the "match patterns" not starting `!` and non of the "ignore patterns" starting with `!`.
-empty_dirs | Boolean | `false` | Include empty directories. A directory is considered empty if it contains no files or directories to include *according the filtering criteria*.
-linked_dirs | Boolean | `true` | Include symbolic links to directories.
-linked_files | Boolean | `true` | Include symbolic links to files.
+match_patterns | Array of Strings | `["*"]` (match all) | Wildcard matching. Path relative to root directory to hash is matched against the provided patterns. The path must match at least on of the "match patterns" not starting `!` and non of the "ignore patterns" starting with `!`.
+include_linked_dirs | Boolean | `true` | Include symbolic links to directories.
+include_linked_files | Boolean | `true` | Include symbolic links to files.
+include_empty_dirs | Boolean | `false` | Include empty directories. A directory is considered empty if it contains no files or directories to include *according the filtering criteria*.
+
+
+
 
 ## Protocol
 The `DIRHASH` of a directory is obtained by taking the underlying hash function's
@@ -175,36 +181,48 @@ version of the Dirhash Standard. No distinction is  made between files and
 "hard links" to files.
 
 The `ENTRY-DESCRIPTOR` is composed by concatenation of an ordered sequence of entry
-properties separated by a space ` `, where each property is represented by its name 
-and value is separated by a colon `:`:
+properties separated by the [null character](https://en.wikipedia.org/wiki/Null_character) `\000`, where each property is represented by its name 
+and value separated by a colon `:`:
 
 ```<name>:<value> <name>:<value>...```,
 
 ```python
 properties = {'property_1': 'value_1', ...}
-descriptor = ' '.join(['{}:{}'.format(k, v) for k, v in sorted(properties.items())])
+descriptor = '\000'.join(['{}:{}'.format(k, v) for k, v in sorted(properties.items())])
 ```
-Thus space ` `, colon `:` and newline `\n` are not allowed in property names or 
+Thus the null character is the only character not allowed in property names or 
 values.
+
 
 ### Entry Properties
 Refers to data or metadata of a Directory Entry.
 
-Name  | Value | Affected by Options  | Comment/Rationale
------ | ----- | -------------------- | -----------------
-type  | Type of the entry, or the entry linked to if a symlink; `d` for directories, `f` for files. | - | One must differentiate between files and directories to obtain weak collision resistance, since it is easy to construct a file with the same hash as the `DIRHASH` of a directory.
-name | Hash function hexdigest of the name of the entry (the name of the link itself if a symlink, *not* the entry linked to). | hash_name | The name is also hashed separately to avoid any risk of collisions arising from what characters are allowed and not in file names.
-content | Hash function hexdigest of the main data of the entry, or the entry linked to if a symlink; the binary data of files and the `DIRAHASH` of directories | hash_content, on_cyclic_link | -
-is_link | Whether the entry is a symlink; `true` or `false`. | hash_is_link | -
+Name  | Value | Inclusion | Comment/Rationale
+----- | ----- | --------- | -----------------
+type  | Type of the entry, or the entry linked to if a symlink; `d` for directories, `f` for files. | Mandatory | One must differentiate between files and directories to obtain weak collision resistance, since it is easy to construct a file with the same hash as the `DIRHASH` of a directory.
+name | The name of the entry (the name of the link itself if a symlink, *not* the entry linked to). | Optional, but one of `name` and `content` must always be included. | For the typical use case, the entry name should affect the hash, so that content and other metadata is tied to the name and, subsequently, to the entry's relative path to the root directory (which follows from the hierarchical nature of the Dirhash Standard).
+content | Hash function hexdigest of the main data of the entry, or the entry linked to, if a symlink; the binary data of files and the `DIRAHASH` of directories. A special case is when the protocol option `on_cyclic_link` is `store_reference` see [cyclic links](#cyclic-links) section below. | Mandatory for directories (`type`=`d`), Optional for files, but one of `name` and `content` must always be included. | For the typical use case, content should affect the hash. Without it, only the structure of the file tree is hashed. 
+is_link | Whether the entry is a symlink; `true` or `false`. | For the typical use case, it does *not* matter if a file or directory is linked or not - the file tree is "perceived the same" for many applications. If it matters, this property can be included. 
+
+
+### Cyclic Links
+When using symbolically linked directories it is possible to create cycles in the, otherwise acyclic, graph representing the file tree. If not handled properly, this lead to infinite recursion when parsing the file tree (this is e.g. the case for Python's built in [`os.walk(directory, followlinks=True)`](https://stackoverflow.com/questions/36977259/avoiding-infinite-recursion-with-os-walk/36977580)). Moreover, this breaks the hierarchical nature of the Dirhash Protocol where file hash values are aggregated recursively from the *leaf nodes* up to the root directory. With cyclic links there is not a well defined (finite) set of leaf nodes. The Dirhash Standard include two alternatives for handling this, selected by the Protocol option `on_cyclic_link`, which have their respective limitations.
+
+#### `on_cycli_link`: `"raise"`
+The the first option is to consider cyclic links an [error condition](#error-conditions) and raise an appropriate exception when detected (preferably before reaching the recursion limit of language of implementation!).
+
+#### `on_cycli_link`: `"hash reference"`
+The other option is to 
 
 
 ### Protocol Options
 Name  | Type             | Default             | Description 
 ----  | ---------------- | ------------------- | -----------
-hash_name | Boolean | `true` | ...
-hash_content | Boolean | `true` | ...
-hash_is_link | Boolean | `false` | ...
-on_cyclic_link | String, One of `"raise"` and `"store reference"` | `"raise"` | ...
+entry_properties | Array of Strings | `["name", "content"]` | Which Directory Entry properties to consider. NOTE that `type` is a mandatory property and should not be provided
+on_cyclic_link | String, One of `"raise"` and `"hash reference"` | `"raise"` | ...
+
+The Dirhash Protocol is designed so that the same hash should not be obtained with different protocol options (even if that would not necessarily be a problem, since when comparing checksums, the options must be provided as well). This is convenient since it means that when the same hash is obtained one can be sure that the same Protocol Options 
+
 
 
 ## Error Conditions
@@ -214,9 +232,32 @@ on_cyclic_link | String, One of `"raise"` and `"store reference"` | `"raise"` | 
 
 **Cyclic Symbolic Links**: TODO
 
+
+## The `DIRSUM` JSON Object
+```json
+{
+   "dirhash": "...",
+   "algorithm": "...",
+   "filtering_options": {
+      "match_patterns": ["*"],
+      "linked_dirs": true,
+      "linked_files": true,
+      "empty_dirs": false},
+   "protocol_options": {
+      "entry_properties": ["name", "content"],
+      "on_cyclic_link": "raise"}
+}
+```
+
+Recommended file extension: `<name>.dirsum.json`
+
+
 ## Possible Extensions
-- **Permission Properties**: These are to get platform independent (different on windows/unix). The best option is
-probably to let go of platform independence here. Possible properties could be `permission-[owner|group|user]` or `permission-me` for permissions of current 
+- **Permission Properties**: These are hard to get platform independent (different on windows/unix). The best option is probably to let go of platform independence here. Possible properties could be `permission-[owner|group|user]` or `permission-me` for permissions of current 
 process, 
 - **Owning User/Group**
 - **Last Modified/Opened Properties**
+
+
+## Open Questions
+- ...
