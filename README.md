@@ -152,7 +152,7 @@ Mainly matching of file path
 ### Filtering Options
 Name  | Type             | Default             | Description 
 ----  | ---------------- | ------------------- | -----------
-match_patterns | Array of Strings | `["*"]` (match all) | Wildcard matching. Path relative to root directory to hash is matched against the provided patterns. The path must match at least on of the "match patterns" not starting `!` and non of the "ignore patterns" starting with `!`.
+match_patterns | Array of Strings | `["*"]` (match all) | Wildcard matching. Path relative to the dirhash root is matched against the provided patterns. The path must match at least on of the "match patterns" not starting `!` and non of the "ignore patterns" starting with `!`.
 include_linked_dirs | Boolean | `true` | Include symbolic links to directories.
 include_linked_files | Boolean | `true` | Include symbolic links to files.
 include_empty_dirs | Boolean | `false` | Include empty directories. A directory is considered empty if it contains no files or directories to include *according the filtering criteria*.
@@ -199,20 +199,36 @@ Refers to data or metadata of a Directory Entry.
 
 Name  | Value | Inclusion | Comment/Rationale
 ----- | ----- | --------- | -----------------
-type  | Type of the entry, or the entry linked to if a symlink; `d` for directories, `f` for files. | Mandatory | One must differentiate between files and directories to obtain weak collision resistance, since it is easy to construct a file with the same hash as the `DIRHASH` of a directory.
-name | The name of the entry (the name of the link itself if a symlink, *not* the entry linked to). | Optional, but one of `name` and `content` must always be included. | For the typical use case, the entry name should affect the hash, so that content and other metadata is tied to the name and, subsequently, to the entry's relative path to the root directory (which follows from the hierarchical nature of the Dirhash Standard).
-content | Hash function hexdigest of the main data of the entry, or the entry linked to, if a symlink; the binary data of files and the `DIRAHASH` of directories. A special case is when the protocol option `on_cyclic_link` is `store_reference` see [cyclic links](#cyclic-links) section below. | Mandatory for directories (`type`=`d`), Optional for files, but one of `name` and `content` must always be included. | For the typical use case, content should affect the hash. Without it, only the structure of the file tree is hashed. 
-is_link | Whether the entry is a symlink; `true` or `false`. | For the typical use case, it does *not* matter if a file or directory is linked or not - the file tree is "perceived the same" for many applications. If it matters, this property can be included. 
+dirhash | The `DIRHASH` of the directory. A special case is when the protocol option `on_cyclic_link` is `store reference` see [cyclic links](#cyclic-links) section below. | Always included for directories. *Not applicable to files*. | This is the recursive part of the Dirhash Protocol, all content of (sub) directories is summarized by the dirhash.
+data | Hash function hexdigest of the binary data of the file, or the file linked to, if a symlink. | Optional, but one of `name` and `data` must always be included. *Not applicable to directories*. | For the typical use case, content should affect the hash. Without it, only the structure of the file tree is hashed. 
+name | The name of the entry (the name of the link itself if a symlink, *not* the entry linked to). | Optional, but one of `name` and `data` must always be included. | For the typical use case, the entry name should affect the hash, so that content and other metadata is tied to the name and, subsequently, to the entry's relative path to the dirhash root (which follows from the recursive nature of the Dirhash Standard).
+is_link | Whether the entry is a symlink; `true` or `false`. | Optional. | For the typical use case, it does *not* matter if a file or directory is linked or not - the file tree is "perceived the same" for many applications. If it matters, this property can be included. 
 
 
 ### Cyclic Links
-When using symbolically linked directories it is possible to create cycles in the, otherwise acyclic, graph representing the file tree. If not handled properly, this lead to infinite recursion when parsing the file tree (this is e.g. the case for Python's built in [`os.walk(directory, followlinks=True)`](https://stackoverflow.com/questions/36977259/avoiding-infinite-recursion-with-os-walk/36977580)). Moreover, this breaks the hierarchical nature of the Dirhash Protocol where file hash values are aggregated recursively from the *leaf nodes* up to the root directory. With cyclic links there is not a well defined (finite) set of leaf nodes. The Dirhash Standard include two alternatives for handling this, selected by the Protocol option `on_cyclic_link`, which have their respective limitations.
+When using symbolically linked directories it is possible to create cycles in the, otherwise acyclic, graph representing the file tree. If not handled properly, this leads to infinite recursion when traversing the file tree (this is e.g. the case for Python's built in [`os.walk(directory, followlinks=True)`](https://stackoverflow.com/questions/36977259/avoiding-infinite-recursion-with-os-walk/36977580)). Moreover, this breaks the recursive definition of the Dirhash Protocol, which offers two alternative ways of handling the special case, specified by the option `on_cyclic_link`.
 
-#### `on_cycli_link`: `"raise"`
+#### `on_cyclic_link`: `"raise"`
 The the first option is to consider cyclic links an [error condition](#error-conditions) and raise an appropriate exception when detected (preferably before reaching the recursion limit of language of implementation!).
 
-#### `on_cycli_link`: `"hash reference"`
-The other option is to 
+#### `on_cyclic_link`: `"hash reference"`
+The other option is to replace the dirhash value with the hash function hexdigest of the relative path from the link to the target. The path is normalized according the unix standard (with forward slash `/` separating directories) and without a leading or trailing slash. This is done for the *first symlink to a directory that has already been visited on the current branch of recursion*. This requires that the real path (or inode and device ID) of visited directories, together with the path relative to the dirhash root, is cached during traversal of the file tree.  
+
+In the example below there are cycles all branches `root/A/B`, `root/A/C` and `root/D`.
+```
+root/
+|__A/
+|  |__B/
+|  |  |__toA@ -> ..
+|  |
+|  |__C/
+|     |__toA@ -> ..
+|
+|__D/
+   |__toB@ -> ../A
+```
+In this case, the value of the dirhash property for the symlinks `root/A/B/toA`, `root/A/C/toA` and `root/D/toB/toA/B/toA` are replaced by the hash of `".."`. Note that for the third branch, the cyclic reference can be *detected* already at `root/D/toB/toA/B` (since `B` is already visited) but it is for `root/D/toB/toA/B/toA` that the replacement happens. This reflects the fact that it is the `toA` that's *causing* the cycle (not `root/D/toB` or `root/D/toB/toA/B`) and at `root/D/toB/toA/` it can not yet be detected.
+
 
 
 ### Protocol Options
@@ -244,7 +260,7 @@ The Dirhash Protocol is designed so that the same hash should not be obtained wi
       "linked_files": true,
       "empty_dirs": false},
    "protocol_options": {
-      "entry_properties": ["name", "content"],
+      "entry_properties": ["name", "data"],
       "on_cyclic_link": "raise"}
 }
 ```
