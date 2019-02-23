@@ -10,6 +10,7 @@
 - [The `DIRSUM` Object](#the-dirsum-object)
 - [Extensions](#extensions)
 - [Contribute](#contribute)
+- [Appendix](#appendix)
 
 ## Introduction
 The Dirhash Standard describes a formal procedure for computing a single hash value, the `DIRHASH`, of a filesystem directory.
@@ -122,23 +123,23 @@ Name  | Type             | Default             | Description
 entry_properties | Array of Strings | `["name", "data"]` | Which Directory Entry properties to consider. NOTE that `type` is a mandatory property and should not be provided
 on_cyclic_link | String, One of `"raise"` and `"hash reference"` | `"raise"` | how to handle [cyclic links](#cyclic-links).
 
-The Dirhash Protocol is designed so that the same hash should not be obtained with different Protocol Options. Subsequently, when the same hash is obtained one can be sure that the same Protocol Options was used. The options must still be provided when comparing checksums, but this trait reduces the risk of mistakes.
+The Dirhash Protocol is designed so that the same hash should not be obtained with different Protocol Options. Subsequently, when the same hash is obtained one can be sure that the same Protocol Options were used. The options must still be provided when comparing checksums, but this removes the risk of false positives (confirmation of the checksum) due to wrong options used.
 
 
 
 ## Error Conditions
-**Directory Not Accessible**: Not accessible (sub) directories results in an error unless excluded by the `match_patterns` filtering option.
+**Directory Not Accessible**: A not accessible (sub)directory results in an error unless excluded by the `match_patterns` filtering option.
 
-**File Not Accessible**: Not accessible files results in an error if entry property `data` is used unless excluded by the `match_patterns` filtering option.
+**File Not Accessible**: A not accessible file results in an error if the entry property `data` is used unless excluded by the `match_patterns` filtering option.
 
 **Cyclic Symbolic Links**: Presence of cyclic links, with `on_cyclic_links` set to `raise`.
 
-**Directory Empty**: No Directory entries to hash given provided Filtering Options and `include_empty_dirs` set to `false`.  
+**Directory Empty**: No (non-empty) directory entries to hash in the Dirhash root directory, given provided Filtering Options and `include_empty_dirs` set to `false`.  
 
 
 
 ## The `DIRSUM` Object
-Checksums based on the `DIRSHASH` must contain the additional configuration options to be properly validated (as was discussed in the [Introduction](#introduction)). For this purpose, the Dirhash Standard provides the `DIRSUM` object which contains all the necessary information for verification. It's structure is laid out in JSON notation below, properties as per the [Hash Function](#hash-function-options), [Filtering](#filtering-options) and [Protocol Options](#protocol-options).
+Checksums based on the `DIRSHASH` must contain the additional configuration options to be properly validated (as was discussed in the [Introduction](#introduction)). For this purpose, the Dirhash Standard provides the `DIRSUM` object which contains all the necessary information for verification. It's structure is laid out in JSON below, with properties according [Hash Function](#hash-function-options), [Filtering](#filtering-options) and [Protocol Options](#protocol-options).
 ```json
 {
    "dirhash": "...",
