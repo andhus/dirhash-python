@@ -58,7 +58,7 @@ Filtering governs what files and subdirectories to include. This is done by matc
 ### Filtering Options
 Name  | Type             | Default             | Description 
 ----  | ---------------- | ------------------- | -----------
-match_patterns | Array of Strings | `["*"]` (match all) | Wildcard matching. Path relative to the dirhash root is matched against the provided patterns. The path must match at least one of the "match patterns" (*not* starting with `!`) and none of the "ignore patterns" (starting with `!`).
+match_patterns | Array of Strings | `["*"]` (match all) | Wildcard matching. Path relative to the Dirhash root is matched against the provided patterns. The path must match at least one of the "match patterns" (*not* starting with `!`) and none of the "ignore patterns" (starting with `!`).
 linked_dirs | Boolean | `true` | Include (i.e. follow) symbolic links to directories.
 linked_files | Boolean | `true` | Include symbolic links to files.
 empty_dirs | Boolean | `false` | Include empty directories. A directory is considered empty if it contains no files or directories to include *given the Filtering Options*.
@@ -81,13 +81,14 @@ A *directory entry* is either a subdirectory, a file or a symbolic link. Other f
 
 The `ENTRY-DESCRIPTOR` is composed by concatenation of an ordered sequence of entry properties separated by the [null character](https://en.wikipedia.org/wiki/Null_character) `\000`. Each property is represented by its name and value separated by a colon `:`:
 
-```<name>:<value> <name>:<value>...```,
+```<name>:<value>\000<name>:<value>...\000<name>:<value>```,
 
 in python:
 
 ```python
-properties = {'property_1': 'value_1', ...}
-descriptor = '\000'.join(['{}:{}'.format(k, v) for k, v in sorted(properties.items())])
+entry_properties = {'property_1': 'value_1', ...}
+entry_property_strings = ['{}:{}'.format(k, v) for k, v in entry_properties.items()]
+entry_descriptor = '\000'.join(sorted(entry_property_strings))
 ```
 The null character is the only character not allowed in property names or values (to maintain collision resistance).
 
@@ -99,7 +100,7 @@ Name  | Value | Inclusion | Comment/Rationale
 ----- | ----- | --------- | -----------------
 dirhash | The `DIRHASH` of a subdirectory or the target directory in case of a symbolic link, except for [cyclic links](#cyclic-links). | Always included for directories. *Not applicable to files*. | This is the recursive part of the Dirhash Protocol; the content of each subdirectory is summarized by its `DIRHASH`.
 data | Hash function hexdigest of the binary data of the file, or the file linked to, if a symlink. | Optional, but one of `name` and `data` must always be included. *Not applicable to directories*. | For the typical use case, the data should affect the hash. Without it, only the paths to files and subdirectories are hashed. 
-name | The name of the entry (the name of the link itself if a symlink, *not* the entry linked to). | Optional, but one of `name` and `data` must always be included. | For the typical use case, the entry name should affect the hash, so that data and other metadata is tied to the name and, subsequently, to the entry's relative path to the dirhash root (which follows from the recursive nature of the Dirhash Standard).
+name | The name of the entry (the name of the link itself if a symlink, *not* the entry linked to). | Optional, but one of `name` and `data` must always be included. | For the typical use case, the entry name should affect the hash, so that data and other metadata is tied to the name and, subsequently, to the entry's relative path to the Dirhash root (which follows from the recursive nature of the Dirhash Standard).
 is_link | Whether the entry is a symlink; `true` or `false`. | Optional. | For the typical use case, it does *not* matter if a file or directory is linked or not - the file tree is "perceived the same" for many applications. If it matters, this property can be included. 
 
 
@@ -112,36 +113,7 @@ The the first option is to consider cyclic links an [error condition](#error-con
 #### `on_cyclic_link`: `"hash reference"`
 The other option is to replace the dirhash value for the cyclic link with the hash function hexdigest of the relative path from the link to the target. The path is normalized according to the unix standard (with a forward slash `/` separating directories) and without a leading or trailing slash. 
 
-Sometimes multiple links form cycles together. Without loss of generality, cyclic links are defined as the *first occurrence of a link to a directory that has already been visited on the current branch of recursion*. The real path (or inode and device ID) of visited directories, together with the path relative to the dirhash root, must typically be cached during traversal of the file tree to identify and resolve cyclic links.
-
-In the example below there are cycles on all branches `A/B`, `A/C` and `D`.
-```
-root/
-|__A/
-|  |__B/
-|  |  |__toA@ -> ..
-|  |__C/
-|     |__toA@ -> ..
-|__D/
-   |__toB@ -> ../A/B
-```
-In this case, the value of the dirhash property for the symlinks `A/B/toA`, `A/C/toA` and `D/toB/toA/B/toA` is replaced by the hash of `".."`. Note that for the third branch, the presence of cyclic links can be *detected* already at `D/toB/toA/B` (since `B` is already visited) but it is for `D/toB/toA/B/toA` that the replacement happens. This reflects the fact that it is the `toA` that's *causing* the cycle, not `D/toB` or `D/toB/toA/B` (which is not even a link), and at `D/toB/toA/` the cycle is not yet be detected.
-
-Below is another example where multiple links are involved in forming cycles as well as links which absolute path is external to the Dirhash root. In this case the cyclic links and relative paths to hash are: `root/A/toB/toA` (`"../A"`), `root/B/toA/toB` (`"../B"`) and `root/C/toD/toC` (`"../.."`).
-
-```
-/path/to/root/
-         |__A/
-         |  |__toB@ -> ../B
-         |__B/
-         |  |__toA@ -> /path/to/root/A
-         |__C/
-            |__toD@ -> /path/to/D
-         
-/path/to/D/
-         |__toC@ -> /path/to/root/C
-```
-
+Sometimes multiple links form cycles together. Without loss of generality, cyclic links are defined as the *first occurrence of a link to a directory that has already been visited on the current branch of recursion*. The real path (or inode and device ID) of visited directories, together with the path relative to the Dirhash root, must typically be cached during traversal of the file tree to identify and resolve cyclic links. For further details, see these [examples](#cyclic-links-examples).
 
 
 ### Protocol Options
@@ -196,3 +168,35 @@ process,
 If you find a bug, inconsistency or weakness in the Dirhash Standard, or that the documentation or the Standard itself can be simplified without loss of generality, please file an issue!
 
 If you have a use case that is not covered, it can hopefully be supported by an extension of the Standard. Please file an issue or make a PR if you think that it can benefit others.
+
+## Appendix
+
+### Cyclic Links: Examples
+
+In the example below there are cycles on all branches `A/B`, `A/C` and `D`.
+```
+root/
+|__A/
+|  |__B/
+|  |  |__toA@ -> ..
+|  |__C/
+|     |__toA@ -> ..
+|__D/
+   |__toB@ -> ../A/B
+```
+In this case, the value of the dirhash property for the symlinks `A/B/toA`, `A/C/toA` and `D/toB/toA/B/toA` is replaced by the hash of `".."`. Note that for the third branch, the presence of cyclic links can be *detected* already at `D/toB/toA/B` (since `B` is already visited) but it is for `D/toB/toA/B/toA` that the replacement happens. This reflects the fact that it is the `toA` that's *causing* the cycle, not `D/toB` or `D/toB/toA/B` (which is not even a link), and at `D/toB/toA/` the cycle is not yet be detected.
+
+Below is another example where multiple links are involved in forming cycles as well as links which absolute path is external to the Dirhash root. In this case the cyclic links and relative paths to hash are: `root/A/toB/toA` (`"../A"`), `root/B/toA/toB` (`"../B"`) and `root/C/toD/toC` (`"../.."`).
+
+```
+/path/to/root/
+         |__A/
+         |  |__toB@ -> ../B
+         |__B/
+         |  |__toA@ -> /path/to/root/A
+         |__C/
+            |__toD@ -> /path/to/D
+         
+/path/to/D/
+         |__toC@ -> /path/to/root/C
+```
