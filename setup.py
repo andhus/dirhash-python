@@ -24,6 +24,7 @@ setup(
     author_email="andhus@kth.se",
     license='MIT',
     install_requires=[
+        'attrs>=18.0.0',
         'pathspec>=0.5.9',
         'scandir>=1.9.0;python_version<"3.5"'
     ],
