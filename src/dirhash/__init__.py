@@ -25,6 +25,8 @@ from pathspec import PathSpec
 from pathspec import RecursionError as _RecursionError
 from pathspec.patterns import GitWildMatchPattern
 
+from dirhash.compat import fspath
+
 
 __version__ = pkg_resources.require("dirhash")[0].version
 
@@ -266,6 +268,7 @@ _empty_dir_descriptor = _dirs_files_separator
 
 
 def _verify_is_directory(directory):
+    directory = fspath(directory)
     if not os.path.exists(directory):
         raise ValueError('{}: No such directory'.format(directory))
     if not os.path.isdir(directory):
