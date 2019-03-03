@@ -102,6 +102,7 @@ def traverse(
     dir_apply=identity,
     follow_links=True,
     cache_file_apply=False,
+    include_empty=True,
     jobs=1
 ):
     _verify_is_directory(directory)
@@ -120,6 +121,7 @@ def traverse(
         file_apply=file_apply,
         dir_apply=dir_apply,
         follow_links=follow_links,
+        include_empty=include_empty,
         parents={path.real: path},
     )
     result = dir_apply(root_dir_node)
@@ -173,6 +175,7 @@ def _traverse_recursive(
     file_apply,
     dir_apply,
     follow_links,
+    include_empty,
     parents,
 ):
     """TODO"""
@@ -193,7 +196,9 @@ def _traverse_recursive(
     files = []
     for subpath in filter_(path.scandir()):
         if subpath.is_dir():
-            dirs.append(dir_apply(_traverse_recursive(subpath, **fwd_kwargs)))
+            dir_node = _traverse_recursive(subpath, **fwd_kwargs)
+            if include_empty or not dir_node.empty:
+                dirs.append(dir_apply(dir_node))
         if subpath.is_file():
             files.append(file_apply(subpath))
 
@@ -265,6 +270,10 @@ class RecursionPath(object):
         return attr.evolve(self, relative=relative, real=real, dir_entry=dir_entry)
 
     @property
+    def path(self):
+        return self._dir_entry.path
+
+    @property
     def name(self):
         return self._dir_entry.name
 
@@ -299,7 +308,7 @@ class RecursionPath(object):
     #     self.root, self.relative, self.real, self._dir_entry = state
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, cmp=False)
 class DirEntryReplacement(object):
     path = attr.ib(converter=fspath)
     name = attr.ib()
@@ -358,6 +367,30 @@ class DirEntryReplacement(object):
 
     def inode(self):
         return self.stat(follow_symlinks=False).st_ino
+
+    def __eq__(self, other):
+        if not isinstance(other, (DirEntryReplacement, DirEntry)):
+            return False
+        if not self.path == other.path:
+            return False
+        if not self.name == other.name:
+            return False
+        for method, kwargs in [
+            ('is_dir', {'follow_symlinks': True}),
+            ('is_dir', {'follow_symlinks': False}),
+            ('is_file', {'follow_symlinks': True}),
+            ('is_file', {'follow_symlinks': False}),
+            ('is_symlink', {}),
+            ('stat', {'follow_symlinks': True}),
+            ('stat', {'follow_symlinks': False}),
+            ('inode', {})
+        ]:
+            this_res = getattr(self, method)(**kwargs)
+            other_res = getattr(other, method)(**kwargs)
+            if not this_res == other_res:
+                return False
+
+            return True
 
 
 @attr.s(slots=True, frozen=True)

@@ -1,6 +1,8 @@
 from __future__ import print_function, division
 
 # from pathlib import Path
+from functools import partial
+
 from py._path.local import LocalPath
 
 import os
@@ -8,12 +10,13 @@ import pytest
 
 from dirhash.compat import scandir
 
-from dirhash.traverse import RecursionPath, RecursionFilterBase
+from dirhash.traverse import RecursionPath, RecursionFilterBase, traverse, DirNode
 from dirhash.traverse import DirEntryReplacement
 from dirhash.traverse import get_included_paths
 
 
 def assert_dir_entry_equal(de1, de2):
+    assert de1.path == de2.path
     assert de1.name == de2.name
     for method, kwargs in [
         ('is_dir', {'follow_symlinks': True}),
@@ -48,7 +51,9 @@ class TestDirEntryReplacement(object):
             de_rep_from_entry = self.test_class.from_dir_entry(de_true)
             de_rep_from_path = self.test_class.from_path(tmpdir.join(de_true.name))
             assert_dir_entry_equal(de_rep_from_entry, de_true)
+            assert de_rep_from_entry == de_true
             assert_dir_entry_equal(de_rep_from_path, de_true)
+            assert de_rep_from_path == de_true
 
     def test_raise_on_not_exists(self, tmpdir):
         with pytest.raises(IOError):
@@ -93,6 +98,21 @@ class TestRecursionPath(object):
             assert_dir_entry_equal(sub_de, sub_rpath)
 
 
+def get_mock_recursion_path(relative, root=None, is_dir=False, is_symlink=False):
+    dir_entry = DirEntryReplacement(
+        path=relative,
+        name=os.path.basename(relative)
+    )
+    dir_entry._is_dir = is_dir
+    dir_entry._is_symlink = is_symlink
+    return RecursionPath(
+        root=root,
+        relative=relative,
+        real=None,
+        dir_entry=dir_entry
+    )
+
+
 class TestDirNode(object):
     from dirhash.traverse import DirNode as test_class
 
@@ -124,20 +144,6 @@ class TestDirNode(object):
 class TestRecursionFilterBase(object):
     from dirhash.traverse import RecursionFilterBase as test_class
 
-    def get_mock_path(self, relative, is_dir=False, is_symlink=False):
-        dir_entry = DirEntryReplacement(
-            path=relative,
-            name=os.path.basename(relative)
-        )
-        dir_entry._is_dir = is_dir
-        dir_entry._is_symlink = is_symlink
-        return RecursionPath(
-            root=None,
-            relative=relative,
-            real=None,
-            dir_entry=dir_entry
-        )
-
     @pytest.mark.parametrize(
         'description, filter_kwargs, expected_output',
         [
@@ -165,10 +171,10 @@ class TestRecursionFilterBase(object):
         expected_output
     ):
         paths = [
-            self.get_mock_path('dir', is_dir=True),
-            self.get_mock_path('dir/file.txt'),
-            self.get_mock_path('ldir', is_dir=True, is_symlink=True),
-            self.get_mock_path('dir/lfile', is_symlink=True),
+            get_mock_recursion_path('dir', is_dir=True),
+            get_mock_recursion_path('dir/file.txt'),
+            get_mock_recursion_path('ldir', is_dir=True, is_symlink=True),
+            get_mock_recursion_path('dir/lfile', is_symlink=True),
         ]
         relpath_to_path = {path.relative: path for path in paths}
         filtered_paths = list(self.test_class(**filter_kwargs)(paths))
@@ -201,6 +207,41 @@ class TestMatchPatterns(TestRecursionFilterBase):
         expected_output
     ):
         self.test_call(description, filter_kwargs, expected_output)
+
+
+class TestTraverse(object):
+
+    def test_basic(self, tmpdir):
+        tmpdir.ensure('root/f1')
+        tmpdir.ensure('root/d1/f1')
+        tmpdir.ensure('root/d1/d11/f1')
+        tmpdir.ensure('root/d2/f1')
+        root = tmpdir.join('root')
+        tree = traverse(root)
+
+        def rp(relative):
+            recursion_path = RecursionPath.from_root(root.join(relative))
+            recursion_path.relative = relative
+            recursion_path.root = root.strpath
+
+            return recursion_path
+
+        tree_expected = DirNode(
+            path=rp(''),
+            files=[rp('f1')],
+            directories=[
+                DirNode(
+                    path=rp('d1'),
+                    files=[rp('d1/f1')],
+                    directories=[
+                        DirNode(
+                            path=rp('d1/d11'),
+                            files=[rp('d1/d11/f1')])]),
+                DirNode(
+                    path=rp('d2'),
+                    files=[rp('d2/f1')])])
+
+        assert tree == tree_expected
 
 
 class TestGetIncludedPaths(object):
