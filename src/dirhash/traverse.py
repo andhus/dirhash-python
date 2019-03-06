@@ -95,7 +95,7 @@ def identity(x):
 #
 
 
-def traverse(
+def traverse(  # TODO rename scantree
     directory,
     recursion_filter=identity,
     file_apply=identity,
@@ -137,9 +137,6 @@ def _traverse_multiprocess(**kwargs):
     file_paths = []
 
     def extract_paths(path):
-        # hacky way to support pickling
-        # (__set/getstate__ does not work for slotted attrs classes)
-        path._dir_entry = DirEntryReplacement.from_dir_entry(path._dir_entry)
         result_idx = len(file_paths)
         file_paths.append(path)
         return result_idx
@@ -164,7 +161,7 @@ def _cached_by_realpath(file_apply):
     def file_apply_cached(path):
         if path.real not in cache:
             cache[path.real] = file_apply(path)
-        return cache[path]
+        return cache[path.real]
 
     return file_apply_cached
 
@@ -295,17 +292,24 @@ class RecursionPath(object):
     def __fspath__(self):
         return self.real
 
-    # TODO bellow has no effect when pickling?
-    # def __getstate__(self):
-    #     return (
-    #         self.root,
-    #         self.relative,
-    #         self.real,
-    #         DirEntryReplacement.from_dir_entry(self._dir_entry)
-    #     )
-    #
-    # def __setstate__(self, state):
-    #     self.root, self.relative, self.real, self._dir_entry = state
+    @staticmethod
+    def _getstate(self):
+        return (
+            self.root,
+            self.relative,
+            self.real,
+            DirEntryReplacement.from_dir_entry(self._dir_entry)
+        )
+
+    @staticmethod
+    def _setstate(self, state):
+        self.root, self.relative, self.real, self._dir_entry = state
+
+
+# Attrs overrides __get/setstate__ for slotted classes, see:
+# https://github.com/python-attrs/attrs/issues/512
+RecursionPath.__getstate__ = RecursionPath._getstate
+RecursionPath.__setstate__ = RecursionPath._setstate
 
 
 @attr.s(slots=True, cmp=False)
@@ -390,7 +394,7 @@ class DirEntryReplacement(object):
             if not this_res == other_res:
                 return False
 
-            return True
+        return True
 
 
 @attr.s(slots=True, frozen=True)
@@ -423,43 +427,48 @@ class CyclicLinkedDir(object):
     target_path = attr.ib(validator=attr.validators.instance_of(RecursionPath))
 
 
-class RecursionFilterABC(with_metaclass(abc.ABCMeta)):
+class RecursionFilter(object):
 
-    @abc.abstractmethod
-    def __call__(self, paths):
-        pass
-
-
-class RecursionFilterBase(RecursionFilterABC):
-
-    def __init__(self, linked_dirs=True, linked_files=True):
+    def __init__(
+        self,
+        linked_dirs=True,
+        linked_files=True,
+        match=None,
+    ):
         self.linked_dirs = linked_dirs
         self.linked_files = linked_files
-
-    def include(self, path):
-        if not path.is_symlink():
-            return True
-        if path.is_dir():
-            return self.linked_dirs
+        self._match_patterns = tuple('*') if match is None else tuple(match)
+        if self._match_patterns != tuple('*'):
+            self._path_spec = PathSpec.from_lines(
+                GitWildMatchPattern,
+                self.match_patterns
+            )
         else:
-            return self.linked_files
+            self._path_spec = None
+
+    @property
+    def match_patterns(self):
+        return self._match_patterns
+
+    def include(self, recursion_path):
+        if recursion_path.is_symlink():
+            if recursion_path.is_dir() and not self.linked_dirs:
+                return False
+            if recursion_path.is_file() and not self.linked_files:
+                return False
+
+        if recursion_path.is_dir():
+            # only filepaths matched against patterns
+            return True
+
+        return self.match_file(recursion_path.relative)
+
+    def match_file(self, filepath):
+        if self._path_spec is None:
+            return True
+        return match_file(self._path_spec.patterns, normalize_file(filepath))
 
     def __call__(self, paths):
         for path in paths:
             if self.include(path):
                 yield path
-
-
-class MatchPatterns(RecursionFilterBase):
-
-    def __init__(self, match_patterns=None, **kwargs):
-        super(MatchPatterns, self).__init__(**kwargs)
-        match_patterns = match_patterns or ['*']
-        self.path_spec = PathSpec.from_lines(GitWildMatchPattern, match_patterns)
-
-    def include(self, path):
-        if not super(MatchPatterns, self).include(path):
-            return False
-        if path.is_dir():
-            return True
-        return match_file(self.path_spec.patterns, normalize_file(path.relative))

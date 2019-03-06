@@ -1,18 +1,21 @@
 from __future__ import print_function, division
 
-# from pathlib import Path
+import os
+
+from time import sleep, time
 from functools import partial
 
-from py._path.local import LocalPath
-
-import os
 import pytest
 
 from dirhash.compat import scandir
-
-from dirhash.traverse import RecursionPath, RecursionFilterBase, traverse, DirNode
-from dirhash.traverse import DirEntryReplacement
-from dirhash.traverse import get_included_paths
+from dirhash.traverse import (
+    DirNode,
+    traverse,
+    RecursionPath,
+    RecursionFilter,
+    DirEntryReplacement,
+    get_included_paths,
+    CyclicLinkedDir)
 
 
 def assert_dir_entry_equal(de1, de2):
@@ -54,6 +57,31 @@ class TestDirEntryReplacement(object):
             assert de_rep_from_entry == de_true
             assert_dir_entry_equal(de_rep_from_path, de_true)
             assert de_rep_from_path == de_true
+
+            # test not equal
+            de_rep = self.test_class.from_dir_entry(de_true)
+            assert de_rep != 'other type'
+
+            for attribute in ['path', 'name']:
+                de_rep = self.test_class.from_dir_entry(de_true)
+                setattr(de_rep, attribute, "wrong value")
+                assert de_rep != de_true
+
+            for bool_attr in ['_is_dir', '_is_file', '_is_symlink']:
+                de_rep = self.test_class.from_dir_entry(de_true)
+                assert de_rep == de_true  # must load cache values before negating
+                setattr(de_rep, bool_attr, not getattr(de_rep, bool_attr))
+                assert de_rep != de_true
+
+            de_rep = self.test_class.from_dir_entry(de_true)
+            assert de_rep == de_true
+            de_rep._stat_sym = "wrong_value"
+            assert de_rep != de_true
+
+            de_rep = self.test_class.from_dir_entry(de_true)
+            assert de_rep == de_true
+            de_rep._stat_nosym = "wrong_value"
+            assert de_rep != de_true
 
     def test_raise_on_not_exists(self, tmpdir):
         with pytest.raises(IOError):
@@ -97,6 +125,14 @@ class TestRecursionPath(object):
         for sub_de, sub_rpath in zip(sub_des, sub_rpaths):
             assert_dir_entry_equal(sub_de, sub_rpath)
 
+    def test_picklable(self, tmpdir):
+        rpath = self.test_class.from_root(tmpdir)
+        state = rpath.__getstate__()
+        dir_entry = state[-1]
+        assert isinstance(dir_entry, DirEntryReplacement)
+        rpath.__setstate__(state)
+        assert rpath._dir_entry is dir_entry
+
 
 def get_mock_recursion_path(relative, root=None, is_dir=False, is_symlink=False):
     dir_entry = DirEntryReplacement(
@@ -104,6 +140,7 @@ def get_mock_recursion_path(relative, root=None, is_dir=False, is_symlink=False)
         name=os.path.basename(relative)
     )
     dir_entry._is_dir = is_dir
+    dir_entry._is_file = not is_dir
     dir_entry._is_symlink = is_symlink
     return RecursionPath(
         root=root,
@@ -142,26 +179,46 @@ class TestDirNode(object):
 
 
 class TestRecursionFilterBase(object):
-    from dirhash.traverse import RecursionFilterBase as test_class
+    from dirhash.traverse import RecursionFilter as test_class
 
     @pytest.mark.parametrize(
         'description, filter_kwargs, expected_output',
         [
-            ('include all',
-             {'linked_dirs': True, 'linked_files': True},
-             ['dir', 'dir/file.txt', 'ldir', 'dir/lfile']),
-            ('default include all',
-             {},
-             ['dir', 'dir/file.txt', 'ldir', 'dir/lfile']),
-            ('exclude linked dirs',
-             {'linked_dirs': False, 'linked_files': True},
-             ['dir', 'dir/file.txt', 'dir/lfile']),
-            ('exclude linked files',
-             {'linked_dirs': True, 'linked_files': False},
-             ['dir', 'dir/file.txt', 'ldir']),
-            ('exclude linked files and dirs',
-             {'linked_dirs': False, 'linked_files': False},
-             ['dir', 'dir/file.txt']),
+            (
+                'include all',
+                {'linked_dirs': True, 'linked_files': True},
+                ['dir', 'dir/file.txt', 'ldir', 'dir/lfile']
+            ),
+            (
+                'default include all',
+                {},
+                ['dir', 'dir/file.txt', 'ldir', 'dir/lfile']
+            ),
+            (
+                'exclude linked dirs',
+                {'linked_dirs': False, 'linked_files': True},
+                ['dir', 'dir/file.txt', 'dir/lfile']
+            ),
+            (
+                'exclude linked files',
+                {'linked_dirs': True, 'linked_files': False},
+                ['dir', 'dir/file.txt', 'ldir']
+            ),
+            (
+                'exclude linked files and dirs',
+                {'linked_dirs': False, 'linked_files': False},
+                ['dir', 'dir/file.txt']
+            ),
+            (
+                'include only .txt files (dirs always included)',
+                {'match': ['*.txt']},
+                ['dir', 'dir/file.txt', 'ldir']
+            ),
+            (
+                'exclude .txt files (dirs always included)',
+                {'match': ['*', '!*.txt']},
+                ['dir', 'ldir', 'dir/lfile']
+            ),
         ]
     )
     def test_call(
@@ -177,36 +234,20 @@ class TestRecursionFilterBase(object):
             get_mock_recursion_path('dir/lfile', is_symlink=True),
         ]
         relpath_to_path = {path.relative: path for path in paths}
-        filtered_paths = list(self.test_class(**filter_kwargs)(paths))
+        rfilter = self.test_class(**filter_kwargs)
+        filtered_paths = list(rfilter(paths))
         assert filtered_paths == [
             relpath_to_path[relpath] for relpath in expected_output
         ]
 
 
-class TestMatchPatterns(TestRecursionFilterBase):
-    from dirhash.traverse import MatchPatterns as test_class
+def _slow_identity(x, wait_time):
+    sleep(wait_time)
+    return x
 
-    @pytest.mark.parametrize(
-        'description, filter_kwargs, expected_output',
-        [
-            ('default include all',
-             {'match_patterns': ['*']},
-             ['dir', 'dir/file.txt', 'ldir', 'dir/lfile']),
-            ('include only .txt files (dirs always included)',
-             {'match_patterns': ['*.txt']},
-             ['dir', 'dir/file.txt', 'ldir']),
-            ('exclude .txt files (dirs always included)',
-             {'match_patterns': ['*', '!*.txt']},
-             ['dir', 'ldir', 'dir/lfile']),
-        ]
-    )
-    def test_call_match(
-        self,
-        description,
-        filter_kwargs,
-        expected_output
-    ):
-        self.test_call(description, filter_kwargs, expected_output)
+
+def get_slow_identity_f(wait_time):
+    return partial(_slow_identity, wait_time=wait_time)
 
 
 class TestTraverse(object):
@@ -217,6 +258,7 @@ class TestTraverse(object):
         tmpdir.ensure('root/d1/d11/f1')
         tmpdir.ensure('root/d2/f1')
         root = tmpdir.join('root')
+
         tree = traverse(root)
 
         def rp(relative):
@@ -236,15 +278,172 @@ class TestTraverse(object):
                     directories=[
                         DirNode(
                             path=rp('d1/d11'),
-                            files=[rp('d1/d11/f1')])]),
+                            files=[rp('d1/d11/f1')]
+                        )
+                    ]
+                ),
                 DirNode(
                     path=rp('d2'),
-                    files=[rp('d2/f1')])])
+                    files=[rp('d2/f1')]
+                )
+            ]
+        )
 
         assert tree == tree_expected
 
+    def test_not_a_directory(self, tmpdir):
+        tmpdir.ensure('root/f1')
+        # does not exist
+        with pytest.raises(ValueError):
+            traverse(tmpdir.join('wrong_root'))
+        # is a file
+        with pytest.raises(ValueError):
+            traverse(tmpdir.join('root/f1'))
+
+    def test_cyclic_links(self, tmpdir):
+        root = tmpdir.join('root')
+        d1 = root.join('d1')
+        d1.ensure(dir=True)
+        d1.join('link_back_d1').mksymlinkto(d1)
+        d1.join('link_back_root').mksymlinkto(root)
+
+        tree = traverse(root)
+
+        def rp(relative):
+            recursion_path = RecursionPath.from_root(root.join(relative))
+            recursion_path.relative = relative
+            recursion_path.root = root.strpath
+
+            return recursion_path
+
+        tree_expected = DirNode(
+            path=rp(''),
+            directories=[
+                DirNode(
+                    path=rp('d1'),
+                    directories=[
+                        CyclicLinkedDir(
+                            path=rp('d1/link_back_d1'),
+                            target_path=rp('d1')
+                        ),
+                        CyclicLinkedDir(
+                            path=rp('d1/link_back_root'),
+                            target_path=rp('')
+                        )
+                    ]
+                )
+            ]
+        )
+
+        assert tree == tree_expected
+
+    def test_include_empty(self, tmpdir):
+        root = tmpdir.join('root')
+        root.join('d1').ensure(dir=True)
+
+        tree_default = traverse(root)
+        tree_empty_true = traverse(root, include_empty=True)
+        tree_empty_false = traverse(root, include_empty=False)
+
+        def rp(relative):
+            recursion_path = RecursionPath.from_root(root.join(relative))
+            recursion_path.relative = relative
+            recursion_path.root = root.strpath
+
+            return recursion_path
+
+        tree_empty_true_expected = DirNode(
+            path=rp(''),
+            directories=[DirNode(path=rp('d1'))]
+        )
+        tree_empty_false_expected = DirNode(path=rp(''))
+
+        assert tree_default == tree_empty_true_expected
+        assert tree_empty_true == tree_empty_true_expected
+        assert tree_empty_false == tree_empty_false_expected
+
+    def test_multiprocess_speedup(self, tmpdir):
+        num_files = 10
+        for i in range(num_files):
+            tmpdir.join('file_{}'.format(i)).ensure()
+
+        wait_time = 0.05
+        expected_min_elapsed = wait_time * num_files
+        slow_file_apply = get_slow_identity_f(wait_time)
+        start = time()
+        traverse(tmpdir, file_apply=slow_file_apply)
+        end = time()
+        elapsed_sequential = end - start
+        assert elapsed_sequential > expected_min_elapsed
+
+        start = time()
+        traverse(tmpdir, file_apply=slow_file_apply, jobs=num_files)
+        end = time()
+        elapsed_muliproc = end - start
+        assert elapsed_muliproc < expected_min_elapsed / 2
+        # just require at least half to account for multiprocessing overhead
+
+    def test_cache_by_real_path_speedup(self, tmpdir):
+        target_file = tmpdir.join('target_file')
+        target_file.ensure()
+        num_links = 10
+        for i in range(num_links):
+            tmpdir.join('link_{}'.format(i)).mksymlinkto(target_file)
+
+        wait_time = 0.01
+        expected_min_elapsed = wait_time * (num_links + 1)
+        slow_file_apply = get_slow_identity_f(wait_time)
+        start = time()
+        traverse(tmpdir, file_apply=slow_file_apply)
+        end = time()
+        elapsed_sequential = end - start
+        assert elapsed_sequential > expected_min_elapsed
+        overhead = elapsed_sequential - expected_min_elapsed
+
+        overhead_margin_factor = 1.5
+        expected_max_elapsed = overhead * overhead_margin_factor + wait_time
+        assert expected_max_elapsed < expected_min_elapsed
+        start = time()
+        traverse(tmpdir, file_apply=slow_file_apply, cache_file_apply=True)
+        end = time()
+        elapsed_cache = end - start
+        assert elapsed_cache < expected_max_elapsed
+
+    def test_cache_together_with_multiprocess_speedup(self, tmpdir):
+        target_file_names = ['target_file_1', 'target_file_2']
+        num_links_per_file = 10
+        for i, target_file_name in enumerate(target_file_names):
+            target_file = tmpdir.join(target_file_name)
+            target_file.ensure()
+            for j in range(num_links_per_file):
+                tmpdir.join('link_{}_{}'.format(i, j)).mksymlinkto(target_file)
+        num_links = num_links_per_file * len(target_file_names)
+
+        wait_time = 0.01
+        jobs = 2
+        expected_min_elapsed = (
+            wait_time * (num_links + len(target_file_names))
+        ) / jobs
+        slow_file_apply = get_slow_identity_f(wait_time)
+        start = time()
+        traverse(tmpdir, file_apply=slow_file_apply, jobs=2)
+        end = time()
+        elapsed_mp = end - start
+        assert elapsed_mp > expected_min_elapsed
+        overhead = elapsed_mp - expected_min_elapsed
+
+        overhead_margin_factor = 1.5
+        expected_max_elapsed = overhead * overhead_margin_factor + wait_time * 2
+        assert expected_max_elapsed < expected_min_elapsed
+        start = time()
+        traverse(tmpdir, file_apply=slow_file_apply, cache_file_apply=True, jobs=2)
+        end = time()
+        elapsed_mp_cache = end - start
+        assert elapsed_mp_cache < expected_max_elapsed
+
 
 class TestGetIncludedPaths(object):
+    """Testing of `traverse` with a `recursion_filter`"""
 
     def test_basic(self, tmpdir):
         tmpdir.ensure('root/f1')
@@ -259,15 +458,6 @@ class TestGetIncludedPaths(object):
         # test pure string path as well
         filepaths = get_included_paths(tmpdir.join('root').strpath)
         assert filepaths == expected_filepaths
-
-    def test_not_a_directory(self, tmpdir):
-        tmpdir.ensure('root/f1')
-        # does not exist
-        with pytest.raises(ValueError):
-            get_included_paths(tmpdir.join('wrong_root'))
-        # is a file
-        with pytest.raises(ValueError):
-            get_included_paths(tmpdir.join('root/f1'))
 
     def test_symlinked_file(self, tmpdir):
         tmpdir.ensure('root/f1')
@@ -284,7 +474,7 @@ class TestGetIncludedPaths(object):
 
         filepaths = get_included_paths(
             root,
-            recursion_filter=RecursionFilterBase(linked_files=False),
+            recursion_filter=RecursionFilter(linked_files=False),
         )
         assert filepaths == ['f1']
 
@@ -308,6 +498,6 @@ class TestGetIncludedPaths(object):
         # correct way to ignore linked dirs completely:
         filepaths = get_included_paths(
             root,
-            recursion_filter=RecursionFilterBase(linked_dirs=False),
+            recursion_filter=RecursionFilter(linked_dirs=False),
         )
         assert filepaths == ['f1']
