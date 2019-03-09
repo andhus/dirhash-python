@@ -16,8 +16,8 @@ from dirhash import (
     dirhash,
     algorithms_available,
     algorithms_guaranteed,
-    _empty_dir_descriptor
 )
+from dirhash.traverse import SymlinkRecursionError
 
 
 class TestGetHasherFactory(object):
@@ -191,12 +191,20 @@ class TestGetIncludedPaths(TempDirTest):
         self.mkfile('linked_file')
         self.symlink('linked_file', 'root/f2')
 
-        # NOTE `follow_links` hash no effect if only the file is linked (as is the
-        # case here), linked _files_ are always included.
-        filepaths = get_included_paths(self.path_to('root'), follow_links=False)
+        filepaths = get_included_paths(
+            self.path_to('root'),
+            filter_options={'linked_files': True}
+        )
         assert filepaths == ['f1', 'f2']
 
-        filepaths = get_included_paths(self.path_to('root'), follow_links=True)
+        filepaths = get_included_paths(
+            self.path_to('root'),
+            filter_options={'linked_files': False}
+        )
+        assert filepaths == ['f1']
+
+        # default is 'linked_files': True
+        filepaths = get_included_paths(self.path_to('root'),)
         assert filepaths == ['f1', 'f2']
 
     def test_symlinked_dir(self):
@@ -207,25 +215,44 @@ class TestGetIncludedPaths(TempDirTest):
         self.mkfile('linked_dir/f2')
         self.symlink('linked_dir', 'root/d1')
 
-        filepaths = get_included_paths(self.path_to('root'), follow_links=False)
+        filepaths = get_included_paths(
+            self.path_to('root'),
+            filter_options={'linked_dirs': False}
+        )
         assert filepaths == ['f1']
 
-        filepaths = get_included_paths(self.path_to('root'), follow_links=True)
+        filepaths = get_included_paths(
+            self.path_to('root'),
+            filter_options={'linked_dirs': True}
+        )
         assert filepaths == ['d1/f1', 'd1/f2', 'f1']
 
-        # default is `follow_links=True`
+        # default is 'linked_dirs': True
         filepaths = get_included_paths(self.path_to('root'))
         assert filepaths == ['d1/f1', 'd1/f2', 'f1']
 
-    def test_raise_on_infinite_recursion(self):
+    def test_cyclic_link(self):
         self.mkdirs('root/d1')
         self.symlink('root', 'root/d1/link_back')
-        with pytest.raises(RecursionError) as exc_info:
-            get_included_paths(self.path_to('root'), follow_links=True)
+        with pytest.raises(SymlinkRecursionError) as exc_info:
+            get_included_paths(
+                self.path_to('root'),
+                protocol_options={'on_cyclic_link': 'raise'}
+            )
         assert exc_info.value.real_path == os.path.realpath(self.path_to('root'))
         assert exc_info.value.first_path == self.path_to('root/')
         assert exc_info.value.second_path == self.path_to('root/d1/link_back')
         assert str(exc_info.value).startswith('Symlink recursion:')
+
+        filepaths = get_included_paths(
+            self.path_to('root'),
+            protocol_options={'on_cyclic_link': 'hash_reference'}
+        )
+        assert filepaths == ['d1/link_back/.']
+
+        # default is 'on_cyclic_link': 'raise'
+        with pytest.raises(SymlinkRecursionError):
+            filepaths = get_included_paths(self.path_to('root'))
 
     def test_ignore_hidden_files(self):
         self.mkdirs('root/d1')
@@ -242,7 +269,10 @@ class TestGetIncludedPaths(TempDirTest):
         assert filepaths == ['.d2/f1', '.f2', 'd1/.f2', 'd1/f1', 'f1']
 
         # with ignore
-        filepaths = get_included_paths(self.path_to('root'), match=['*', '!.*'])
+        filepaths = get_included_paths(
+            self.path_to('root'),
+            filter_options={'match_patterns': ['*', '!.*']}
+        )
         assert filepaths == ['.d2/f1', 'd1/f1', 'f1']
 
     def test_exclude_hidden_dirs(self):
@@ -260,7 +290,10 @@ class TestGetIncludedPaths(TempDirTest):
         assert filepaths == ['.d2/f1', '.f2', 'd1/.f2', 'd1/f1', 'f1']
 
         # with ignore
-        filepaths = get_included_paths(self.path_to('root'), match=['*', '!.*/'])
+        filepaths = get_included_paths(
+            self.path_to('root'),
+            filter_options={'match_patterns': ['*', '!.*/']}
+        )
         assert filepaths == ['.f2', 'd1/.f2', 'd1/f1', 'f1']
 
     def test_exclude_hidden_dirs_and_files(self):
@@ -280,7 +313,7 @@ class TestGetIncludedPaths(TempDirTest):
         # using ignore
         filepaths = get_included_paths(
             self.path_to('root'),
-            match=['*', '!.*/', '!.*']
+            filter_options={'match_patterns': ['*', '!.*/', '!.*']}
         )
         assert filepaths == ['d1/f1', 'f1']
 
@@ -300,7 +333,7 @@ class TestGetIncludedPaths(TempDirTest):
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            match=['*', '!*.skip1', '!*.skip2']
+            filter_options={'match_patterns': ['*', '!*.skip1', '!*.skip2']}
         )
         assert filepaths == [
             'd1/f.txt', 'f', 'f.skip1.txt', 'f.skip1skip2', 'f.txt', 'fskip1']
@@ -314,14 +347,20 @@ class TestGetIncludedPaths(TempDirTest):
         self.mkfile('root/d1/f')
         self.mkfile('root/d3/d31/f')
 
-        filepaths = get_included_paths(self.path_to('root'), include_empty=False)
+        filepaths = get_included_paths(
+            self.path_to('root'),
+            filter_options={'empty_dirs': False}
+        )
         assert filepaths == ['d1/f', 'd3/d31/f']
 
         # `include_empty=False` is default
         filepaths = get_included_paths(self.path_to('root'))
         assert filepaths == ['d1/f', 'd3/d31/f']
 
-        filepaths = get_included_paths(self.path_to('root'), include_empty=True)
+        filepaths = get_included_paths(
+            self.path_to('root'),
+            filter_options={'empty_dirs': True}
+        )
         assert filepaths == ['d1/f', 'd2/.', 'd3/d31/f', 'd4/d41/.']
 
     def test_empty_dirs_because_of_filter_include_vs_exclude(self):
@@ -333,49 +372,59 @@ class TestGetIncludedPaths(TempDirTest):
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            match=['*', '!.*'],
-            include_empty=False
+            filter_options={
+                'match_patterns': ['*', '!.*'],
+                'empty_dirs': False
+            }
         )
         assert filepaths == ['d1/f']
 
         # `include_empty=False` is default
         filepaths = get_included_paths(
             self.path_to('root'),
-            match=['*', '!.*'],
+            filter_options={'match_patterns': ['*', '!.*']},
         )
         assert filepaths == ['d1/f']
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            match=['*', '!.*'],
-            include_empty=True
+            filter_options={
+                'match_patterns': ['*', '!.*'],
+                'empty_dirs': True
+            }
         )
         assert filepaths == ['d1/f', 'd2/.']
 
-    def test_empty_dir_not_included_due_to_not_match(self):
+    def test_empty_dir_inclusion_not_affected_by_match(self):
         self.mkdirs('root/d1')
         self.mkdirs('root/.d2')
 
-        filepaths = get_included_paths(
-            self.path_to('root'),
-            match=['*', '!.*'],
-            include_empty=True
-        )
-        assert filepaths == ['d1/.']
+        # NOTE that empty dirs are not excluded by match_patterns:
 
-        # NOTE that empty dirs are matched as is they were files (leafs!)
-        # TODO better option?
         filepaths = get_included_paths(
             self.path_to('root'),
-            match=['*', '!.*/'],
-            include_empty=True
+            filter_options={
+                'match_patterns': ['*', '!.*'],
+                'empty_dirs': True
+            }
         )
         assert filepaths == ['.d2/.', 'd1/.']
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            match=['*', '!d1/'],
-            include_empty=True
+            filter_options={
+                'match_patterns': ['*', '!.*/'],
+                'empty_dirs': True
+            }
+        )
+        assert filepaths == ['.d2/.', 'd1/.']
+
+        filepaths = get_included_paths(
+            self.path_to('root'),
+            filter_options={
+                'match_patterns': ['*', '!d1'],
+                'empty_dirs': True
+            }
         )
         assert filepaths == ['.d2/.', 'd1/.']
 
@@ -481,10 +530,11 @@ class Testdirhash(TempDirTest):
     def test_empty_root_include_empty(self):
         self.mkdirs('root')
         dirhash = dirhash_mp_comp(self.path_to('root'), 'sha256', include_empty=True)
-        expected_dirhash = hashlib.sha256(
-            _empty_dir_descriptor.encode('utf-8')
-        ).hexdigest()
-        assert dirhash == expected_dirhash
+        assert False  # TODO
+        # expected_dirhash = hashlib.sha256(
+        #     _empty_dir_descriptor.encode('utf-8')
+        # ).hexdigest()
+        # assert dirhash == expected_dirhash
 
     def test_include_empty(self):
         self.mkdirs('root/d1')

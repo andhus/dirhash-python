@@ -3,7 +3,7 @@
 
 Provides the functions:
 - `dirhash`
-- `get_included_paths`.
+- `get_leafpaths`.
 """
 from __future__ import print_function, division
 
@@ -14,16 +14,7 @@ import pkg_resources
 from functools import partial
 from multiprocessing import Pool
 
-# Use the built-in version of scandir/walk if possible (python > 3.5),
-# otherwise use the scandir module version
-try:
-    from os import scandir
-except ImportError:  # pragma: no cover
-    from scandir import scandir
-
-from pathspec import PathSpec
-from pathspec import RecursionError as _RecursionError
-from pathspec.patterns import GitWildMatchPattern
+from dirhash.traverse import CyclicLinkedDir, traverse, RecursionFilter
 
 from dirhash.compat import fspath
 
@@ -33,24 +24,284 @@ __version__ = pkg_resources.require("dirhash")[0].version
 algorithms_guaranteed = {'md5', 'sha1', 'sha224', 'sha256', 'sha384', 'sha512'}
 algorithms_available = hashlib.algorithms_available
 
-ignorefilename = '.dirhashignore'
-
 
 def dirhash(
     directory,
     algorithm,
-    match=None,
-    ignore=None,
+    filter_options=None,
+    protocol_options=None,
     chunk_size=2**20,
-    content_only=False,
-    paths_only=False,
-    follow_links=True,
-    include_empty=False,
-    workers=None,
-    **kwargs
+    jobs=1
 ):
-    """Computes the hash of a directory based on its structure and content.
+    filter_ = Filter.from_options(filter_options)
+    protocol = Protocol.from_options(protocol_options)
+    hasher_factory = _get_hasher_factory(algorithm)
+    allow_cyclic_links = protocol.on_cyclic_link != protocol.OnCyclicLink.RAISE
 
+    def dir_apply(dir_node):
+        descriptor = protocol.get_descriptor(dir_node)
+        _dirhash = hasher_factory(descriptor.encode('utf-8')).hexdigest()
+
+        return dir_node.path, _dirhash
+
+    if jobs == 1:
+        cache = {}
+
+        def file_apply(path):
+            return path, _get_filehash(
+                path.real,
+                hasher_factory,
+                chunk_size=chunk_size,
+                cache=cache
+            )
+
+        _, dirhash_ = traverse(
+            directory,
+            recursion_filter=filter_,
+            file_apply=file_apply,
+            dir_apply=dir_apply,
+            follow_links=True,
+            allow_cyclic_links=allow_cyclic_links,
+            cache_file_apply=False,
+            include_empty=filter_.empty_dirs,
+            jobs=1
+        )
+    else:  # multiprocessing
+        real_paths = set()
+
+        def extract_real_paths(path):
+            real_paths.add(path.real)
+            return path
+
+        root_node = traverse(
+            directory,
+            recursion_filter=filter_,
+            file_apply=extract_real_paths,
+            follow_links=True,
+            allow_cyclic_links=allow_cyclic_links,
+            cache_file_apply=False,
+            include_empty=filter_.empty_dirs,
+            jobs=1
+        )
+        real_paths = list(real_paths)
+        # hash files in parallel
+        file_hashes = _parmap(
+            partial(
+                _get_filehash,
+                hasher_factory=hasher_factory,
+                chunk_size=chunk_size
+            ),
+            real_paths,
+            jobs=jobs
+        )
+        # prepare the mapping with precomputed file hashes
+        real_path_to_hash = dict(zip(real_paths, file_hashes))
+
+        def file_apply(path):
+            return path, real_path_to_hash[path.real]
+
+        _, dirhash_ = root_node.apply(file_apply=file_apply, dir_apply=dir_apply)
+
+    return dirhash_
+
+
+class Filter(RecursionFilter):
+
+    def __init__(
+        self,
+        match_patterns=None,
+        linked_dirs=True,
+        linked_files=True,
+        empty_dirs=False
+    ):
+        super(Filter, self).__init__(
+            linked_dirs=linked_dirs,
+            linked_files=linked_files,
+            match=match_patterns
+        )
+        self.empty_dirs = empty_dirs
+
+    @classmethod
+    def from_options(cls, options):
+        if isinstance(options, Filter):
+            return options
+
+        if options is None:
+            options = {}
+
+        return cls(**options)
+
+
+class Protocol(object):
+
+    class OnCyclicLink(object):
+        RAISE = 'raise'
+        HASH_REFERENCE = 'hash_reference'
+        options = {RAISE, HASH_REFERENCE}
+
+    class EntryProperties(object):
+        NAME = 'name'
+        DATA = 'data'
+        IS_LINK = 'is_link'
+        options = {NAME, DATA, IS_LINK}
+        _DIRHASH = 'dirhash'
+
+    def __init__(
+        self,
+        entry_properties=('name', 'data'),
+        on_cyclic_link='raise'
+    ):
+        entry_properties = set(entry_properties)
+        if not entry_properties.issubset(self.EntryProperties.options):
+            raise ValueError(
+                'entry properties {} not supported'.format(
+                    entry_properties - self.EntryProperties.options)
+            )
+        if not (
+            self.EntryProperties.NAME in entry_properties or
+            self.EntryProperties.DATA in entry_properties
+        ):
+            raise ValueError(
+                'at least one of entry properties `name` and `data` must be used'
+            )
+        self.entry_properties = entry_properties
+        self._include_name = self.EntryProperties.NAME in entry_properties
+        self._include_data = self.EntryProperties.DATA in entry_properties
+        self._include_is_link = self.EntryProperties.IS_LINK in entry_properties
+
+        if on_cyclic_link not in self.OnCyclicLink.options:
+            raise ValueError(
+                '{}: not a valid on_cyclic_link option'.format(on_cyclic_link)
+            )
+        self.on_cyclic_link = on_cyclic_link
+
+    @classmethod
+    def from_options(cls, options):
+        if isinstance(options, Protocol):
+            return options
+
+        if options is None:
+            options = {}
+
+        return cls(**options)
+
+    def get_descriptor(self, dir_node):
+        if isinstance(dir_node, CyclicLinkedDir):
+            return self._get_cyclic_linked_dir_descriptor(dir_node)
+
+        entries = dir_node.directories + dir_node.files
+        entry_descriptors = [
+            self._get_entry_descriptor(
+                self._get_entry_properties(path, entry_hash)
+            ) for path, entry_hash in entries
+        ]
+        return '\n'.join(sorted(entry_descriptors) + [''])
+
+    @staticmethod
+    def _get_entry_descriptor(entry_properties):
+        entry_strings = [
+            '{}:{}'.format(name, value)
+            for name, value in entry_properties
+        ]
+        return '\000'.join(sorted(entry_strings))
+
+    def _get_entry_properties(self, path, entry_hash):
+        properties = []
+        if path.is_dir():
+            properties.append((self.EntryProperties._DIRHASH, entry_hash))
+        elif self._include_data:  # path is file
+            properties.append((self.EntryProperties.DATA, entry_hash))
+
+        if self._include_name:
+            properties.append((self.EntryProperties.NAME, path.name))
+        if self._include_is_link:
+            properties.append((self.EntryProperties.IS_LINK, path.is_symlink))
+
+        return properties
+
+    def _get_cyclic_linked_dir_descriptor(self, dir_node):
+        relpath = dir_node.path.relative
+        target_relpath = dir_node.target_path.relative
+        path_to_target = os.path.relpath(target_relpath, relpath)
+        # TODO normalize posix!
+        return path_to_target
+
+
+def get_included_paths(
+    directory,
+    filter_options=None,
+    protocol_options=None
+):
+    """Inspect what paths are included for the corresponding arguments to the
+    `dirhash.dirhash` function.
+
+    # Arguments:
+        This function accepts the following subset of the function `dirhash.dirhash`
+        arguments: `directory`, `match`, `ignore` `follow_links`, `include_empty`,
+        `ignore_extensions` and `ignore_hidden`, with the same meaning. See docs of
+        `dirhash.dirhash` for further details.
+
+    # Returns
+        A sorted list of the paths ([str]) that would be included in computing the
+        hash of `directory` given the provided arguments.
+    """
+    protocol = Protocol.from_options(protocol_options)
+    filter_ = Filter.from_options(filter_options)
+    allow_cyclic_links = protocol.on_cyclic_link != protocol.OnCyclicLink.RAISE
+
+    leafpaths = traverse(
+        directory,
+        recursion_filter=filter_,
+        follow_links=True,
+        allow_cyclic_links=allow_cyclic_links,
+        include_empty=filter_.empty_dirs
+    ).leafpaths()
+
+    return [
+        path.relative if path.is_file() else os.path.join(path.relative, '.')
+        for path in leafpaths
+    ]
+
+
+def _get_hasher_factory(algorithm):
+    """Returns a "factory" of hasher instances corresponding to the given algorithm
+    name. Bypasses input argument `algorithm` if it is already a hasher factory
+    (verified by attempting calls to required methods).
+    """
+    if algorithm in algorithms_guaranteed:
+        return getattr(hashlib, algorithm)
+
+    if algorithm in algorithms_available:
+        return partial(hashlib.new, algorithm)
+
+    try:  # bypass algorithm if already a hasher factory
+        hasher = algorithm(b'')
+        hasher.update(b'')
+        hasher.hexdigest()
+        return algorithm
+    except:
+        pass
+
+    raise ValueError(
+        '`algorithm` must be one of: {}`'.format(algorithms_available))
+
+
+def _parmap(func, iterable, jobs=1):
+    if jobs == 1:
+        return [func(element) for element in iterable]
+
+    pool = Pool(jobs)
+    try:
+        results = pool.map(func, iterable)
+    finally:
+        pool.close()
+
+    return results
+
+
+_old_docs = """
+    Computes the hash of a directory based on its structure and content.
+    
     # Arguments
         directory (str | pathlib.Path): Path to the directory to hash.
         algorithm (str): The name of the hashing algorithm to use. It is also
@@ -133,138 +384,11 @@ def dirhash(
             `ignore_hidden` (bool): Short for adding `['.*', '.*/']` to the `ignore`
                 patterns, which will exclude hidden files and directories.
 
-        To validate which paths are included, call `dirhash.get_included_paths` with
+        To validate which paths are included, call `dirhash.get_leafpaths` with
         the same values for the arguments: `match`, `ignore` `follow_links`,
         `include_empty`, `ignore_extensions` and `ignore_hidden` to get a list of all
         paths that will be included when computing the hash by this function.
     """
-    abspath = os.path.abspath(directory)
-    _verify_is_directory(abspath)
-
-    if content_only and paths_only:
-        raise ValueError(
-            'only one of arguments `content_only` and `paths_only` can be True')
-
-    hasher_factory = _get_hasher_factory(algorithm)
-    match_filter = _get_match_filter(directory, match=match, ignore=ignore, **kwargs)
-
-    cache = {}
-
-    if workers is not None and workers > 1:
-        # extract all (unique) files
-        _, file_realpaths = _get_leafs(
-            abspath=abspath,
-            match_filter=match_filter,
-            follow_links=follow_links,
-            include_empty=False,
-        )
-        # hash files in parallel
-        pool = Pool(workers)
-        try:
-            file_hashes = pool.map(
-                partial(
-                    _get_filehash,
-                    hasher_factory=hasher_factory,
-                    chunk_size=chunk_size
-                ),
-                file_realpaths
-            )
-        finally:
-            pool.close()
-        # prepare the cache with precomputed file hashes
-        cache = dict(zip(file_realpaths, file_hashes))
-
-    dirhash = _get_dirhash(
-        abspath=abspath,
-        relpath='',
-        hasher_factory=hasher_factory,
-        content_only=content_only,
-        paths_only=paths_only,
-        chunk_size=chunk_size,
-        match_filter=match_filter,
-        follow_links=follow_links,
-        include_empty=include_empty,
-        included_leafs=[],
-        included_file_realpaths=set(),
-        visited_dirs={},
-        cache=cache
-    )
-    if dirhash is _EMPTY:
-        if include_empty:
-            return hasher_factory(_empty_dir_descriptor.encode('utf-8')).hexdigest()
-        else:
-            raise ValueError('{}: Nothing to hash'.format(directory))
-
-    return dirhash
-
-
-def get_included_paths(
-    directory,
-    match=None,
-    ignore=None,
-    follow_links=True,
-    include_empty=False,
-    **kwargs
-):
-    """Inspect what paths are included for the corresponding arguments to the
-    `dirhash.dirhash` function.
-
-    # Arguments:
-        This function accepts the following subset of the function `dirhash.dirhash`
-        arguments: `directory`, `match`, `ignore` `follow_links`, `include_empty`,
-        `ignore_extensions` and `ignore_hidden`, with the same meaning. See docs of
-        `dirhash.dirhash` for further details.
-
-    # Returns
-        A sorted list of the paths ([str]) that would be included in computing the
-        hash of `directory` given the provided arguments.
-    """
-    abspath = os.path.abspath(directory)
-    _verify_is_directory(abspath)
-    match_filter = _get_match_filter(abspath, match=match, ignore=ignore, **kwargs)
-    included_leafs, _ = _get_leafs(
-        abspath=abspath,
-        match_filter=match_filter,
-        follow_links=follow_links,
-        include_empty=include_empty,
-    )
-
-    return sorted(included_leafs)
-
-
-def _get_leafs(
-    abspath,
-    match_filter,
-    follow_links=True,
-    include_empty=False,
-):
-    """An inexpensive "dry-run" of the `_get_dirhash` function to get the leaf-paths
-    that will be included in computing the hash.
-    """
-    included_leafs = []
-    included_file_realpaths = set()
-    _get_dirhash(
-        abspath=abspath,
-        relpath='',
-        hasher_factory=_PlaceHolderHasher,  # avoid computing any hash
-        content_only=False,
-        paths_only=True,  # avoid opening files!
-        chunk_size=None,  # never used
-        match_filter=match_filter,
-        follow_links=follow_links,
-        include_empty=include_empty,
-        included_leafs=included_leafs,
-        included_file_realpaths=included_file_realpaths,
-        visited_dirs={}
-    )
-    return included_leafs, included_file_realpaths
-
-
-_null_chr = '\000'
-_component_separator = _null_chr
-_descriptor_separator = _null_chr * 2
-_dirs_files_separator = _null_chr * 3
-_empty_dir_descriptor = _dirs_files_separator
 
 
 def _verify_is_directory(directory):
@@ -273,181 +397,6 @@ def _verify_is_directory(directory):
         raise ValueError('{}: No such directory'.format(directory))
     if not os.path.isdir(directory):
         raise ValueError('{}: Is not a directory'.format(directory))
-
-
-def _get_match_filter(dir_abspath, ignore, **kwargs):
-    """Helper to construct a function for filtering of paths.
-    """
-    ignore = [] if ignore is None else list(ignore)
-    ignore = _parse_ignorefile(dir_abspath) + ignore
-
-    match_spec = _get_match_spec(ignore=ignore, **kwargs)
-    path_spec = PathSpec.from_lines(GitWildMatchPattern, match_spec)
-
-    return path_spec.match_files
-
-
-def _get_dirhash(abspath, *args, **kwargs):
-    """Entry point of the recursive dirhash implementation, with the only purpose to
-    provide a more informative error in case of (infinite) symlink recursion.
-    """
-    try:
-        return _get_dirhash_recursive(os.path.realpath(abspath), *args, **kwargs)
-    except SymlinkRecursionError as e:
-        raise SymlinkRecursionError(
-            real_path=e.real_path,
-            first_path=os.path.join(abspath, e.first_path),
-            second_path=os.path.join(abspath, e.second_path)
-        )
-
-
-def _get_dirhash_recursive(
-    realpath,
-    relpath,
-    hasher_factory,
-    content_only,
-    paths_only,
-    chunk_size,
-    match_filter,
-    include_empty,
-    follow_links,
-    included_leafs,
-    included_file_realpaths,
-    visited_dirs,
-    cache=None
-):
-    """Recursive implementation for computing the hash of a directory based on its
-    structure and content.
-
-    # Arguments
-        realpath (str): Real path to the current directory to hash.
-        relpath (str): Path to the current directory relative to the root directory
-            (entry point) for the recursion.
-        hasher_factory (f: f() -> hashlib._hashlib.HASH): Callable that returns a
-            instance of the hashlib._hashlib.HASH interface.
-        match_filter (f: f(str) -> bool): Function for filtering leaf paths (files
-            and possibly empty directories) to include.
-        included_leafs ([str]): Continuously appended list of leaf paths (files
-            and possibly empty directories) that are included. Used by
-            `dirhash.get_included_paths`.
-        included_file_realpaths ({str}): Continuously updated set of the real paths
-            to included files. Used by `dirhash.dirhash` when files are hashed using
-            multiprocessing.
-        visited_dirs ({str: str}): Mapping from real path to root-relative path of
-            directories visited previously in *current branch* of recursion. Used to
-            detect if there are symlinks leading to infinite recursion.
-        cache ({str: str}): Mapping from real file path to hash value of already
-            hashed files. Used to avoid duplicating hash computations in the case of
-            repeated occurrence of files by symlinks, as well as to inject
-            precomputed hashes by the multiprocessing implementation
-
-        For args: `content_only`, `paths_only`, `chunk_size`, `include_empty` and
-        `follow_links` see docs of `dirhash.dirhash`.
-
-    # Raises
-        SymlinkRecursionError: in case the current directory has already been
-            visited in current branch of recursion (i.e. would get infinite recursion
-            if continuing).
-
-    # Side-effects
-        Continuously updates arguments: `included_leafs`, `included_file_realpaths`,
-        `visited_dirs` and `cache`.
-
-    # Returns
-        The hash/checksum as a string the of hexadecimal digits of the current
-        `directory` or `hahsdir._EMPTY` if there are no files or directories to
-        include.
-    """
-    fwd_kwargs = vars()
-    del fwd_kwargs['realpath']
-    del fwd_kwargs['relpath']
-
-    if follow_links:
-        if realpath in visited_dirs:
-            raise SymlinkRecursionError(
-                real_path=realpath,
-                # below will be replaced by full abspath in `_get_dirhash`
-                first_path=visited_dirs[realpath],
-                second_path=relpath
-            )
-        visited_dirs[realpath] = relpath
-
-    subdirs, files = [], []
-    symlink_files = set()
-    for dir_entry in scandir(realpath):
-        if dir_entry.is_dir(follow_symlinks=follow_links):
-            subdirs.append(dir_entry)
-        elif dir_entry.is_file(follow_symlinks=True):
-            files.append(dir_entry)
-            if dir_entry.is_symlink():
-                symlink_files.add(dir_entry.name)
-
-    subdir_descriptors = []
-    for subdir in subdirs:
-        if subdir.is_symlink():
-            sub_realpath = os.path.realpath(subdir.path)
-        else:
-            sub_realpath = subdir.path
-        sub_relpath = os.path.join(relpath, subdir.name)
-        sub_dirhash = _get_dirhash_recursive(sub_realpath, sub_relpath, **fwd_kwargs)
-        if sub_dirhash is _EMPTY:
-            if not include_empty:
-                continue
-            if next(match_filter([sub_relpath]), None) is None:
-                # dir is not a match
-                continue
-            # included empty (leaf) directories represented as `path/to/directory/.`
-            included_leafs.append(os.path.join(sub_relpath, '.'))
-            sub_dirhash = hasher_factory(
-                _empty_dir_descriptor.encode('utf-8')
-            ).hexdigest()
-
-        if content_only:
-            subdir_descriptor = sub_dirhash
-        else:
-            subdir_descriptor = _component_separator.join([sub_dirhash, subdir.name])
-        subdir_descriptors.append(subdir_descriptor)
-
-    subdirs_descriptor = _descriptor_separator.join(sorted(subdir_descriptors))
-
-    file_descriptors = []
-    for file_relpath in match_filter(
-        os.path.join(relpath, file_.name) for file_ in files
-    ):
-        filename = os.path.basename(file_relpath)
-        file_realpath = os.path.join(realpath, filename)
-        if filename in symlink_files:
-            file_realpath = os.path.realpath(file_realpath)
-        included_leafs.append(file_relpath)
-        included_file_realpaths.add(file_realpath)
-
-        if paths_only:
-            file_descriptors.append(filename)
-            continue
-
-        filehash = _get_filehash(file_realpath, hasher_factory, chunk_size, cache)
-
-        if content_only:
-            file_descriptors.append(filehash)
-        else:
-            file_descriptors.append(_component_separator.join([filehash, filename]))
-
-    files_descriptor = _descriptor_separator.join(sorted(file_descriptors))
-
-    is_empty = (subdirs_descriptor == '' and files_descriptor == '')
-    if is_empty:
-        return _EMPTY
-
-    descriptor = ''.join(
-        [subdirs_descriptor, _dirs_files_separator, files_descriptor]
-    )
-
-    dirhash = hasher_factory(descriptor.encode('utf-8')).hexdigest()
-
-    if follow_links:
-        del visited_dirs[realpath]
-
-    return dirhash
 
 
 def _get_filehash(filepath, hasher_factory, chunk_size, cache=None):
@@ -483,66 +432,20 @@ def _get_filehash(filepath, hasher_factory, chunk_size, cache=None):
 
     return hasher.hexdigest()
 
-
-class SymlinkRecursionError(_RecursionError):
-    """Raised when symlinks cause a cyclic graph of directories.
-
-    Extends the `pathspec.util.RecursionError` but with a different name (avoid
-    overriding the built-in error!) and with a more informative string representation
-    (used in `dirhash.cli`).
-    """
-    def __str__(self):
-        # _RecursionError.__str__ prints args without context
-        return 'Symlink recursion: {}'.format(self.message)
-
-
-class _Empty(object):
-    """The single instance of this class, `_EMPTY` below, is used as return value for
-    `_get_dirhash_recursive` in the case of an empty directory.
-    """
-    pass
+# class _PlaceHolderHasher(object):
+#     """A hasher that does nothing and always returns an empty string.
+#
+#     Used in the `_get_leafs` "dry-run" of the `_get_dirhash_recursive` function.
+#     """
+#
+#     def __init__(self, *args, **kwargs):
+#         pass
+#
+#     def hexdigest(self):
+#         return ''
 
 
-_EMPTY = _Empty()
-
-
-def _get_hasher_factory(algorithm):
-    """Returns a "factory" of hasher instances corresponding to the given algorithm
-    name. Bypasses input argument `algorithm` if it is already a hasher factory
-    (verified by attempting calls to required methods).
-    """
-    if algorithm in algorithms_guaranteed:
-        return getattr(hashlib, algorithm)
-
-    if algorithm in algorithms_available:
-        return partial(hashlib.new, algorithm)
-
-    try:  # bypass algorithm if already a hasher factory
-        hasher = algorithm(b'')
-        hasher.update(b'')
-        hasher.hexdigest()
-        return algorithm
-    except:
-        pass
-
-    raise ValueError(
-        '`algorithm` must be one of: {}`'.format(algorithms_available))
-
-
-class _PlaceHolderHasher(object):
-    """A hasher that does nothing and always returns an empty string.
-
-    Used in the `_get_leafs` "dry-run" of the `_get_dirhash_recursive` function.
-    """
-
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def hexdigest(self):
-        return ''
-
-
-def _get_match_spec(
+def _get_match_spec(  # TODO rename get_match_patterns
     match=None,
     ignore=None,
     ignore_extensions=None,
@@ -579,14 +482,14 @@ def _get_match_spec(
     return deduplicate(match_spec)
 
 
-def _parse_ignorefile(directory):
-    """Parse ignore file in `directory` (if exists) and return a list of ignore
-    patterns."""
-    ignorefilepath = os.path.join(directory, ignorefilename)
-    if not os.path.exists(ignorefilepath):
-        return []
-
-    with open(ignorefilepath) as f:
-        ignore = [p for p in f.read().splitlines() if not p.startswith('#')]
-
-    return ignore
+# def _parse_ignorefile(directory):
+#     """Parse ignore file in `directory` (if exists) and return a list of ignore
+#     patterns."""
+#     ignorefilepath = os.path.join(directory, ignorefilename)
+#     if not os.path.exists(ignorefilepath):
+#         return []
+#
+#     with open(ignorefilepath) as f:
+#         ignore = [p for p in f.read().splitlines() if not p.startswith('#')]
+#
+#     return ignore
