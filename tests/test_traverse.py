@@ -1,6 +1,7 @@
 from __future__ import print_function, division
 
 import os
+import re
 
 from time import sleep, time
 from functools import partial
@@ -14,8 +15,7 @@ from dirhash.traverse import (
     RecursionPath,
     RecursionFilter,
     DirEntryReplacement,
-    get_included_paths,
-    CyclicLinkedDir)
+    CyclicLinkedDir, SymlinkRecursionError, LinkedDir)
 
 
 def assert_dir_entry_equal(de1, de2):
@@ -300,14 +300,15 @@ class TestTraverse(object):
         with pytest.raises(ValueError):
             traverse(tmpdir.join('root/f1'))
 
-    def test_cyclic_links(self, tmpdir):
+    @pytest.mark.parametrize('include_empty', [True, False])
+    def test_cyclic_links(self, tmpdir, include_empty):
         root = tmpdir.join('root')
         d1 = root.join('d1')
         d1.ensure(dir=True)
         d1.join('link_back_d1').mksymlinkto(d1)
         d1.join('link_back_root').mksymlinkto(root)
 
-        tree = traverse(root)
+        tree = traverse(root, include_empty=include_empty)
 
         def rp(relative):
             recursion_path = RecursionPath.from_root(root.join(relative))
@@ -336,6 +337,62 @@ class TestTraverse(object):
         )
 
         assert tree == tree_expected
+
+        with pytest.raises(SymlinkRecursionError) as exc_info:
+            traverse(root, allow_cyclic_links=False)
+
+        assert re.match(
+            re.compile(
+                "Symlink recursion: Real path .*root/d1' "
+                "was encountered at .*root/d1' "
+                "and then .*root/d1/link_back_d1'."),
+            str(exc_info.value)
+        )
+
+    @pytest.mark.parametrize('include_empty', [True, False])
+    def test_follow_links(self, tmpdir, include_empty):
+        root = tmpdir.join('root')
+        root.join('f1').ensure(dir=False)
+        external_d1 = tmpdir.join('d1')
+        external_d1.join('f2').ensure(dir=False)
+        root.join('link_to_d1').mksymlinkto(external_d1)
+
+        def rp(relative):
+            recursion_path = RecursionPath.from_root(root.join(relative))
+            recursion_path.relative = relative
+            recursion_path.root = root.strpath
+
+            return recursion_path
+
+        tree_follow_false = traverse(
+            root,
+            include_empty=include_empty,
+            follow_links=False
+        )
+        tree_follow_true = traverse(
+            root,
+            include_empty=include_empty,
+            follow_links=True
+        )
+        tree_follow_false_expected = DirNode(
+            path=rp(''),
+            files=[rp('f1')],
+            directories=[
+                LinkedDir(path=rp('link_to_d1'))
+            ]
+        )
+        tree_follow_true_expected = DirNode(
+            path=rp(''),
+            files=[rp('f1')],
+            directories=[
+                DirNode(
+                    path=rp('link_to_d1'),
+                    files=[rp('link_to_d1/f2')]
+                )
+            ]
+        )
+        assert tree_follow_false == tree_follow_false_expected
+        assert tree_follow_true == tree_follow_true_expected
 
     def test_include_empty(self, tmpdir):
         root = tmpdir.join('root')
@@ -442,8 +499,16 @@ class TestTraverse(object):
         assert elapsed_mp_cache < expected_max_elapsed
 
 
-class TestGetIncludedPaths(object):
-    """Testing of `traverse` with a `recursion_filter`"""
+class TestIncludedPaths(object):
+    """Verify included leafpaths given combinations of options"""
+
+    @staticmethod
+    def get_leafpaths(directory, **kwargs):
+        """Extract relative paths to leafs (with extra "/." for directories)"""
+        return [
+            path.relative if path.is_file() else os.path.join(path.relative, '.')
+            for path in traverse(directory, **kwargs).leafpaths()
+        ]
 
     def test_basic(self, tmpdir):
         tmpdir.ensure('root/f1')
@@ -452,11 +517,11 @@ class TestGetIncludedPaths(object):
         tmpdir.ensure('root/d2/f1')
 
         expected_filepaths = ['d1/d11/f1', 'd1/f1', 'd2/f1', 'f1']
-        filepaths = get_included_paths(tmpdir.join('root'))
+        filepaths = self.get_leafpaths(tmpdir.join('root'))
         assert filepaths == expected_filepaths
 
         # test pure string path as well
-        filepaths = get_included_paths(tmpdir.join('root').strpath)
+        filepaths = self.get_leafpaths(tmpdir.join('root').strpath)
         assert filepaths == expected_filepaths
 
     def test_symlinked_file(self, tmpdir):
@@ -465,14 +530,14 @@ class TestGetIncludedPaths(object):
         tmpdir.join('root/f2').mksymlinkto(tmpdir.join('linked_file'))
         root = tmpdir.join('root')
 
-        # NOTE `follow_links` hash no effect if linked files are included
-        filepaths = get_included_paths(root, follow_links=False)
+        # NOTE `follow_links` has no effect if linked files are included
+        filepaths = self.get_leafpaths(root, follow_links=False)
         assert filepaths == ['f1', 'f2']
 
-        filepaths = get_included_paths(root, follow_links=True)
+        filepaths = self.get_leafpaths(root, follow_links=True)
         assert filepaths == ['f1', 'f2']
 
-        filepaths = get_included_paths(
+        filepaths = self.get_leafpaths(
             root,
             recursion_filter=RecursionFilter(linked_files=False),
         )
@@ -485,18 +550,18 @@ class TestGetIncludedPaths(object):
         tmpdir.join('root/d1').mksymlinkto(tmpdir.join('linked_dir'))
         root = tmpdir.join('root')
 
-        filepaths = get_included_paths(root, follow_links=True)
+        filepaths = self.get_leafpaths(root, follow_links=True)
         assert filepaths == ['d1/f1', 'd1/f2', 'f1']
 
         # default is `follow_links=True`
-        filepaths = get_included_paths(root)
+        filepaths = self.get_leafpaths(root)
         assert filepaths == ['d1/f1', 'd1/f2', 'f1']
 
-        filepaths = get_included_paths(root, follow_links=False)
+        filepaths = self.get_leafpaths(root, follow_links=False)
         assert filepaths == ['d1/.', 'f1']
 
         # correct way to ignore linked dirs completely:
-        filepaths = get_included_paths(
+        filepaths = self.get_leafpaths(
             root,
             recursion_filter=RecursionFilter(linked_dirs=False),
         )

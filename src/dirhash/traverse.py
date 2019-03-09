@@ -1,9 +1,7 @@
 from __future__ import print_function, division
 
-import abc
 import os
 
-from six import with_metaclass
 from multiprocessing.pool import Pool
 
 import attr
@@ -11,88 +9,13 @@ import attr
 from pathspec import PathSpec
 from pathspec.util import normalize_file, match_file
 from pathspec.patterns import GitWildMatchPattern
+from pathspec import RecursionError as _RecursionError
 
 from dirhash.compat import scandir, DirEntry, fspath
-from testdir.ldirhash import _verify_is_directory
 
 
 def identity(x):
     return x
-
-#
-# def dirhash(
-#     directory,
-#     algorithm,
-#     chunksize=2**20,
-#     jobs=1
-# ):
-#     hasher_factory = _get_hasher_factory(algorithm)
-#     realpaths = set()
-#
-#     def extract_realpaths(path):
-#         realpaths.add(path.real)
-#         return path
-#
-#     root_node = traverse(directory, file_apply=extract_realpaths)
-#     realpaths = list(realpaths)
-#
-#     # hash files in parallel
-#     file_hashes = mpmap(
-#         partial(_get_filehash, hasher_factory=hasher_factory, chunk_size=chunksize),
-#         realpaths,
-#         jobs=jobs
-#     )
-#     # prepare the cache with precomputed file hashes
-#     realpath_to_hash = dict(zip(realpaths, file_hashes))
-#
-#     def fetch_filehash(path):
-#         return path, realpath_to_hash[path.real]
-#
-#     def get_dirhash(dir_node):
-#         descriptors = []
-#         for path, filehash in dir_node.files:
-#             descriptors.append('_'.join([path.name, filehash]))
-#         for path, sub_dirhash in dir_node.directories:
-#             descriptors.append('_'.join([path.name, sub_dirhash]))
-#         descriptor = '\n'.join(sorted(descriptors) + [''])
-#         dirhash_ = hasher_factory(descriptor.encode('utf-8')).hexdigest()
-#
-#         return dir_node.path, dirhash_
-#
-#     _, root_dirhash = root_node.apply(
-#         dir_apply=get_dirhash,
-#         file_apply=fetch_filehash
-#     )
-#     return root_dirhash
-#
-# def mpmap(func, iterable, jobs=1):
-#     if jobs == 1:
-#         return [func(element) for element in iterable]
-#
-#     pool = Pool(jobs)
-#     try:
-#         results = pool.map(func, iterable)
-#     finally:
-#         pool.close()
-#
-#     return results
-#
-#
-# class DirhashProtocol(object):
-#
-#     def __init__(self, entry_properties=('data', 'name')):
-#         self.entry_properties = entry_properties
-#
-#     def get_descriptor(self, entry_descriptors):
-#         return '\n'.join(sorted(entry_descriptors) + [''])
-#
-#     def get_entry_descriptor(self, entry_properties):
-#         entry_strings = ['{}:{}'.format(k, v) for k, v in entry_properties]
-#         return '\000'.join(sorted(entry_strings))
-#
-#     def get_entry_properties(self, path, entry_hash):
-#         pass # TODO
-#
 
 
 def traverse(  # TODO rename scantree
@@ -101,6 +24,7 @@ def traverse(  # TODO rename scantree
     file_apply=identity,
     dir_apply=identity,
     follow_links=True,
+    allow_cyclic_links=True,
     cache_file_apply=False,
     include_empty=True,
     jobs=1
@@ -121,6 +45,7 @@ def traverse(  # TODO rename scantree
         file_apply=file_apply,
         dir_apply=dir_apply,
         follow_links=follow_links,
+        allow_cyclic_links=allow_cyclic_links,
         include_empty=include_empty,
         parents={path.real: path},
     )
@@ -155,6 +80,14 @@ def _traverse_multiprocess(**kwargs):
     return root_dir_node.apply(dir_apply=dir_apply, file_apply=fetch_result)
 
 
+def _verify_is_directory(directory):
+    directory = fspath(directory)
+    if not os.path.exists(directory):
+        raise ValueError('{}: No such directory'.format(directory))
+    if not os.path.isdir(directory):
+        raise ValueError('{}: Is not a directory'.format(directory))
+
+
 def _cached_by_realpath(file_apply):
     cache = {}
 
@@ -172,6 +105,7 @@ def _traverse_recursive(
     file_apply,
     dir_apply,
     follow_links,
+    allow_cyclic_links,
     include_empty,
     parents,
 ):
@@ -184,7 +118,10 @@ def _traverse_recursive(
             return LinkedDir(path)
         previous_path = parents.get(path.real, None)
         if previous_path is not None:
-            return CyclicLinkedDir(path, previous_path)
+            if allow_cyclic_links:
+                return CyclicLinkedDir(path, previous_path)
+            else:
+                raise SymlinkRecursionError(path, previous_path)
 
     if follow_links:
         parents[path.real] = path
@@ -194,7 +131,10 @@ def _traverse_recursive(
     for subpath in filter_(path.scandir()):
         if subpath.is_dir():
             dir_node = _traverse_recursive(subpath, **fwd_kwargs)
-            if include_empty or not dir_node.empty:
+            if (  # linked dirs does not implement `empty`
+                isinstance(dir_node, LinkedDir) or
+                include_empty or not dir_node.empty
+            ):
                 dirs.append(dir_apply(dir_node))
         if subpath.is_file():
             files.append(file_apply(subpath))
@@ -203,31 +143,6 @@ def _traverse_recursive(
         del parents[path.real]
 
     return DirNode(path=path, directories=dirs, files=files)
-
-
-def get_included_paths(
-    directory,
-    recursion_filter=identity,
-    follow_links=True,
-):
-    included_paths = []
-
-    def file_apply(path):
-        included_paths.append(path.relative)
-
-    def dir_apply(dir_node):
-        if isinstance(dir_node, (LinkedDir, CyclicLinkedDir)):
-            # included leaf directories represented as `path/to/directory/.`
-            included_paths.append(os.path.join(dir_node.path.relative, '.'))
-
-    traverse(
-        directory,
-        recursion_filter=recursion_filter,
-        file_apply=file_apply,
-        dir_apply=dir_apply,
-        follow_links=follow_links
-    )
-    return sorted(included_paths)
 
 
 @attr.s(slots=True)
@@ -256,7 +171,7 @@ class RecursionPath(object):
         )
 
     def scandir(self):
-        return (self._join(dir_entry) for dir_entry in scandir(self.real))
+        return (self._join(dir_entry) for dir_entry in scandir(self.absolute))
 
     def _join(self, dir_entry):
         relative = os.path.join(self.relative, dir_entry.name)
@@ -265,6 +180,10 @@ class RecursionPath(object):
             real = os.path.realpath(real)
 
         return attr.evolve(self, relative=relative, real=real, dir_entry=dir_entry)
+
+    @property
+    def absolute(self):
+        return os.path.join(self.root, self.relative)
 
     @property
     def path(self):
@@ -397,6 +316,25 @@ class DirEntryReplacement(object):
         return True
 
 
+class SymlinkRecursionError(_RecursionError):
+    """Raised when symlinks cause a cyclic graph of directories.
+
+    Extends the `pathspec.util.RecursionError` but with a different name (avoid
+    overriding the built-in error!) and with a more informative string representation
+    (used in `dirhash.cli`).
+    """
+    def __init__(self, path, target_path):
+        super(SymlinkRecursionError, self).__init__(
+            real_path=path.real,
+            first_path=os.path.join(target_path.root, target_path.relative),
+            second_path=os.path.join(path.root, path.relative)
+        )
+
+    def __str__(self):
+        # _RecursionError.__str__ prints args without context
+        return 'Symlink recursion: {}'.format(self.message)
+
+
 @attr.s(slots=True, frozen=True)
 class DirNode(object):
     path = attr.ib(validator=attr.validators.instance_of(RecursionPath))
@@ -415,16 +353,55 @@ class DirNode(object):
         )
         return dir_apply(dir_node)
 
+    def leafpaths(self):
+        leafs = []
+
+        def file_apply(path):
+            leafs.append(path)
+
+        def dir_apply(dir_node):
+            if isinstance(dir_node, (LinkedDir, CyclicLinkedDir)) or dir_node.empty:
+                leafs.append(dir_node.path)
+
+        self.apply(dir_apply=dir_apply, file_apply=file_apply)
+
+        return sorted(leafs, key=lambda path: path.relative)
+
+    def filepaths(self):  # TODO test
+        files = []
+
+        def file_apply(path):
+            files.append(path)
+
+        self.apply(dir_apply=identity, file_apply=file_apply)
+
+        return sorted(files, key=lambda path: path.relative)
+
 
 @attr.s(slots=True, frozen=True)
 class LinkedDir(object):
     path = attr.ib(validator=attr.validators.instance_of(RecursionPath))
+
+    @property
+    def empty(self):
+        raise NotImplementedError('`empty` is undefined for `LinkedDir` nodes.')
+
+    def apply(self, dir_apply, file_apply=None):
+        return dir_apply(self)
 
 
 @attr.s(slots=True, frozen=True)
 class CyclicLinkedDir(object):
     path = attr.ib(validator=attr.validators.instance_of(RecursionPath))
     target_path = attr.ib(validator=attr.validators.instance_of(RecursionPath))
+
+    @property
+    def empty(self):
+        """A cyclic linked dir is never empty."""
+        return False
+
+    def apply(self, dir_apply, file_apply=None):
+        return dir_apply(self)
 
 
 class RecursionFilter(object):
