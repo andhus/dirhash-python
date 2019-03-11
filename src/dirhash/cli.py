@@ -11,6 +11,22 @@ import dirhash
 
 
 def main():
+    try:
+        kwargs = get_kwargs(sys.argv[1:])
+        if kwargs.pop('list'):
+            # kwargs below have no effect when listing
+            for k in ['algorithm', 'chunk_size', 'jobs']:
+                kwargs.pop(k)
+            for leafpath in dirhash.get_included_paths(**kwargs):
+                print(leafpath)
+        else:
+            print(dirhash.dirhash(**kwargs))
+    except Exception as e:
+        sys.stderr.write('dirhash: {}\n'.format(e))
+        sys.exit(1)
+
+
+def get_kwargs(args):
     parser = argparse.ArgumentParser(description='Determine the hash for directory.')
     parser.add_argument(
         '-v', '--version',
@@ -36,102 +52,104 @@ def main():
         ),
         metavar=''
     )
-    parser.add_argument(
+
+    filter_options = parser.add_argument_group(
+        title='Filtering options',
+        description='TODO: what files and directories to include...'
+    )
+    filter_options.add_argument(
         '-m', '--match',
         type=str,
         default='*',
         help='String of match-patterns, separated by blank space.'
     )
-    parser.add_argument(
+    filter_options.add_argument(
         '-i', '--ignore',
         type=str,
         default=None,
         help='String of ignore-patterns, separated by blank space.',
     )
-    parser.add_argument(
+    filter_options.add_argument(
         '-d', '--ignore-hidden',
         action='store_true',
         default=False,
         help='Ignore hidden ("dot") files and directories (short for '
              '`-ignore ".*, "`).'
     )
-    parser.add_argument(
+    filter_options.add_argument(
         '-x', '--ignore-extensions',
         nargs='+',
         help='List of file extensions to ignore.',
         metavar=''
     )
-
-    target_group = parser.add_mutually_exclusive_group(required=False)
-    target_group.add_argument(
-        '-c', '--content-only',
-        action='store_true',
-        default=False,
-        help='Hash only the content of files, not the name and location of files '
-             'within the directory. NOTE (!) the hash will be different if the '
-             '(alpha numerical) order of file paths changes.'
-    )
-    target_group.add_argument(
-        '-p', '--paths-only',
-        action='store_true',
-        default=False,
-        help='Hash only the file paths, i.e. the name and location of files '
-             'within the directory.'
-    )
-
-    parser.add_argument(
-        '--no-follow-links',
-        dest='follow_links',
-        action='store_false',
-        help='Do not follow symbolic links to other *directories*. NOTE: directly '
-             'linked files are always included.'
-    )
-    parser.set_defaults(follow_links=True)
-    parser.add_argument(
-        '--include-empty',
+    filter_options.add_argument(
+        '--empty-dirs',
         action='store_true',
         default=False,
         help='Include empty directories (containing no files that meet the matching '
-             'criteria). Note that the path to the directory itself must still meet '
-             'the matching criteria (matched as if it was a file).'
+             'criteria and no non-empty sub directories).'
     )
-    parser.add_argument(
+    filter_options.add_argument(
+        '--no-linked-dirs',
+        dest='linked_dirs',
+        action='store_false',
+        help='Do not include symbolic links to other directories.'
+    )
+    filter_options.add_argument(
+        '--no-linked-files',
+        dest='linked_files',
+        action='store_false',
+        help='Do not include symbolic links to files.'
+    )
+    parser.set_defaults(linked_dirs=True, linked_files=True)
+
+    protocol_options = parser.add_argument_group(
+        title='Protocol options',
+        description='TODO: what properties to hash...'
+    )
+    protocol_options.add_argument(
+        '-p', '--properties',
+        nargs='+',
+        help='List of properties of files and directories to include in the hash. '
+             'Available properties are: {} and at least one of "name" and "data" '
+             'must be included'.format(dirhash.Protocol.EntryProperties.options),
+        metavar=''
+    )
+    protocol_options.add_argument(
+        '-c', '--allow-cyclic-links',
+        default=False,
+        action='store_true',
+        help='Allow presence of cyclic links.'
+    )
+
+
+    implementation_options = parser.add_argument_group(
+        title='Implementation options',
+        description='TODO'
+    )
+    implementation_options.add_argument(
         '-s', '--chunk-size',
         default=2**20,
         type=int,
         help='The chunk size (in bytes) for reading fo files.'
     )
-    parser.add_argument(
-        '-w', '--workers',
+    implementation_options.add_argument(
+        '-j', '--jobs',
         type=int,
-        default=1,
-        help='Number of workers (parallel processes) to use.'
+        default=1,  # TODO make default number of cores!
+        help='Number of jobs (parallel processes) to use.'
     )
-    parser.add_argument(
+
+    special_options = parser.add_argument_group(title='Special options')
+    special_options.add_argument(
         '-l', '--list',
         action='store_true',
         default=False,
-        help='List the file paths that will be taken into account, followed by the '
-             'hash of directory structure'
+        help='List the file paths that will be taken into account, given the '
+             'provided filtering options.'
     )
 
-    args = parser.parse_args()
-
-    try:
-        kwargs = preprocess_kwargs(vars(args))
-        if kwargs.pop('list'):
-            # kwargs below have no effect when listing
-            for k in [
-                'chunk_size', 'content_only', 'paths_only', 'algorithm', 'workers'
-            ]:
-                kwargs.pop(k)
-            for leafpath in dirhash.get_included_paths(**kwargs):
-                print(leafpath)
-        else:
-            print(dirhash.dirhash(**kwargs))
-    except Exception as e:
-        sys.stderr.write('dirhash: {}\n'.format(e))
-        sys.exit(1)
+    return preprocess_kwargs(vars(parser.parse_args(args)))
 
 
 def preprocess_kwargs(kwargs):
@@ -145,20 +163,40 @@ def preprocess_kwargs(kwargs):
             kwargs[x] = parse_string_arg(kwargs[x][0])
     else:
         kwargs[x] = []
+    match_kwargs = {}
+    for kwarg in ['match', 'ignore', 'ignore_extensions', 'ignore_hidden']:
+        match_kwargs[kwarg] = kwargs.pop(kwarg)
+    match_patterns = dirhash._get_match_spec(**match_kwargs)
 
-    remote_ignorefile = os.environ.get('DIRHASH_IGNORE', None)
-    root_ignorefile_path = os.path.join(kwargs['directory'], dirhash.ignorefilename)
-    if os.path.exists(root_ignorefile_path):
-        kwargs['ignore'] = (
-            dirhash._parse_ignorefile(kwargs['directory']) + list(kwargs['ignore']))
-    elif remote_ignorefile:
-        if not os.path.exists(remote_ignorefile):
-            raise ValueError(
-                'DIRHASH_IGNORE={}: No such file'.format(remote_ignorefile)
-            )
-        with open(remote_ignorefile) as f:
-            kwargs['ignore'] = f.readlines() + kwargs['ignore']
+    filter_options = {
+        'match_patterns': match_patterns,
+        'linked_dirs': kwargs.pop('linked_dirs'),
+        'linked_files': kwargs.pop('linked_files'),
+        'empty_dirs': kwargs.pop('empty_dirs'),
+    }
+    protocol_options = {
+        'on_cyclic_link': (
+            dirhash.Protocol.OnCyclicLink.HASH_REFERENCE
+            if kwargs.pop('allow_cyclic_links')
+            else dirhash.Protocol.OnCyclicLink.RAISE
+        ),
+        'entry_properties': kwargs.pop('properties') or ["data", "name"]
+    }
+    kwargs['filter_options'] = filter_options
+    kwargs['protocol_options'] = protocol_options
 
+    # remote_ignorefile = os.environ.get('DIRHASH_IGNORE', None)
+    # root_ignorefile_path = os.path.join(kwargs['directory'], dirhash.ignorefilename)
+    # if os.path.exists(root_ignorefile_path):
+    #     kwargs['ignore'] = (
+    #         dirhash._parse_ignorefile(kwargs['directory']) + list(kwargs['ignore']))
+    # elif remote_ignorefile:
+    #     if not os.path.exists(remote_ignorefile):
+    #         raise ValueError(
+    #             'DIRHASH_IGNORE={}: No such file'.format(remote_ignorefile)
+    #         )
+    #     with open(remote_ignorefile) as f:
+    #         kwargs['ignore'] = f.readlines() + kwargs['ignore']
     return kwargs
 
 
