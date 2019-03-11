@@ -432,18 +432,6 @@ def _get_filehash(filepath, hasher_factory, chunk_size, cache=None):
 
     return hasher.hexdigest()
 
-# class _PlaceHolderHasher(object):
-#     """A hasher that does nothing and always returns an empty string.
-#
-#     Used in the `_get_leafs` "dry-run" of the `_get_dirhash_recursive` function.
-#     """
-#
-#     def __init__(self, *args, **kwargs):
-#         pass
-#
-#     def hexdigest(self):
-#         return ''
-
 
 def _get_match_spec(  # TODO rename get_match_patterns
     match=None,

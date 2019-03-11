@@ -8,6 +8,7 @@ from time import sleep, time
 
 import pytest
 from pathspec import RecursionError
+from py._path.local import LocalPath
 
 from dirhash import (
     _get_hasher_factory,
@@ -431,7 +432,7 @@ class TestGetIncludedPaths(TempDirTest):
 
 def dirhash_mp_comp(*args, **kwargs):
     res = dirhash(*args, **kwargs)
-    res_mp = dirhash(workers=2, *args, **kwargs)
+    res_mp = dirhash(jobs=2, *args, **kwargs)
     assert res == res_mp
     return res
 
@@ -447,21 +448,48 @@ class Testdirhash(TempDirTest):
         self.mkfile('root/d2/f1', 'd')
 
         for algorithm, expected_hash in [
-            ('md5', '23315916fc3a935b5ed3e120a202aea4'),
-            ('sha1', '6119b22d2916a4af7032802cdb95c742a217fe9f'),
-            ('sha224', 'cdb3a780741c08d6c4ffc6aa0725787f6fbef3e80d81c8850215ef61'),
-            ('sha256', '6fa5594ea7fb6a05fd36c152e6576522'
-                       'a5f37b07c2d797f2ed96527ae18f3fe3'),
-            ('sha384', '453ebd36d95e24149f184589df49f69b'
-                       'f289af3e889c916cc93f0e02367f4d48'
-                       'aef2593ef29f0ecdf3b6e05572e90066'),
-            ('sha512', 'f52ac9eeeb5160637afa91f1f20f1a60'
-                       'ce80a55ac3757f8bb9225e10edc131b4'
-                       '2da10497706ef4f06d36f13dae77540b'
-                       'c0e5484c7f79f87a83c76ae103fff4fa')
+            ('md5', 'cee9cf7d29f773f9df18a6712c54a7f2'),
+            ('sha1', 'fc5256658bb21111d5d1a9879e6c2ce0fd00f713'),
+            ('sha224', '7d8961337c06b27ba00baedd5587fb1f956cfb969d22497cee8651d5'),
+            ('sha256', '785d448a0b92d4b87502e7c95951532d'
+                       '41283362a5d36437769eb8351cab11c9'),
+            ('sha384', 'deaae2d70c6d930eb30ca69d9f5ad110'
+                       '0678de99743943eb627d378073a0896c'
+                       'ab4d65129446ad16430abee4209cdee5'),
+            ('sha512', '67e0334bf8d692c09b658c03fac7b515'
+                       '4cd7171fd7672b150e505538ec634f30'
+                       'c392aeaf2fe4cb8b2de1e7acc60c6ea51'
+                       'd2e6284b1be30453ede0e87ef120044')
         ]:
             hash_value = dirhash_mp_comp(self.path_to('root'), algorithm)
             assert hash_value == expected_hash
+
+    def test_recursive_descriptor(self):
+        self.mkdirs('root/d1')
+        self.mkdirs('root/d2')
+        self.mkfile('root/f1', 'a')
+        self.mkfile('root/d1/f12', 'b')
+
+        f1_desc = 'data:a\000name:f1'
+        f12_desc = 'data:b\000name:f12'
+        d1_desc = 'dirhash:{}\000name:d1'.format(f12_desc + '\n')
+        d2_desc = 'dirhash:\000name:d2'
+
+        empty_dirs_false_expected = '\n'.join([f1_desc, d1_desc, ''])
+        empty_dirs_true_expected = '\n'.join([f1_desc, d2_desc, d1_desc, ''])
+
+        empty_dirs_false = dirhash(
+            self.path_to('root'),
+            algorithm=IdentityHasher
+        )
+        assert empty_dirs_false == empty_dirs_false_expected
+
+        empty_dirs_true = dirhash(
+            self.path_to('root'),
+            algorithm=IdentityHasher,
+            filter_options={'empty_dirs': True}
+        )
+        assert empty_dirs_true == empty_dirs_true_expected
 
     def test_symlinked_file(self):
         self.mkdirs('root1')
@@ -473,16 +501,20 @@ class Testdirhash(TempDirTest):
         self.mkfile('root2/f1', 'a')
         self.mkfile('root2/f2', 'b')
 
-        root1_follow_true = dirhash_mp_comp(
-            self.path_to('root1'), algorithm='md5', follow_links=True)
-        root1_follow_false = dirhash_mp_comp(
-            self.path_to('root1'), algorithm='md5', follow_links=False)
-        root2 = dirhash_mp_comp(
-            self.path_to('root2'), algorithm='md5')
+        root1_linked_files_true = dirhash_mp_comp(
+            self.path_to('root1'), algorithm='md5'
+        )
+        root1_linked_files_false = dirhash_mp_comp(
+            self.path_to('root1'), algorithm='md5',
+            filter_options={'linked_files': False}
+        )
 
-        # NOTE `follow_links` hash no effect if only the file is linked (as is the
-        # case here), linked _files_ are always included.
-        assert root1_follow_false == root1_follow_true == root2
+        root2 = dirhash_mp_comp(
+            self.path_to('root2'), algorithm='md5'
+        )
+
+        assert root1_linked_files_false != root1_linked_files_true
+        assert root1_linked_files_true == root2
 
     def test_symlinked_dir(self):
         self.mkdirs('root1')
@@ -498,15 +530,22 @@ class Testdirhash(TempDirTest):
         self.mkfile('root2/d1/f1', 'b')
         self.mkfile('root2/d1/f2', 'c')
 
-        root1_follow_true = dirhash_mp_comp(
-            self.path_to('root1'), algorithm='md5', follow_links=True)
-        root1_follow_false = dirhash_mp_comp(
-            self.path_to('root1'), algorithm='md5', follow_links=False)
+        root1_linked_dirs_true = dirhash_mp_comp(
+            self.path_to('root1'),
+            algorithm='md5',
+            filter_options={'linked_dirs': True}
+        )
+        root1_linked_dirs_false = dirhash_mp_comp(
+            self.path_to('root1'),
+            algorithm='md5',
+            filter_options={'linked_dirs': False}
+        )
         root2 = dirhash_mp_comp(
-            self.path_to('root2'), algorithm='md5')
+            self.path_to('root2'), algorithm='md5'
+        )
 
-        assert root1_follow_false != root1_follow_true
-        assert root1_follow_true == root2
+        assert root1_linked_dirs_false != root1_linked_dirs_true
+        assert root1_linked_dirs_true == root2
 
     def test_cache_used_for_symlinks(self):
 
@@ -529,12 +568,13 @@ class Testdirhash(TempDirTest):
 
     def test_empty_root_include_empty(self):
         self.mkdirs('root')
-        dirhash = dirhash_mp_comp(self.path_to('root'), 'sha256', include_empty=True)
-        assert False  # TODO
-        # expected_dirhash = hashlib.sha256(
-        #     _empty_dir_descriptor.encode('utf-8')
-        # ).hexdigest()
-        # assert dirhash == expected_dirhash
+        dirhash_ = dirhash_mp_comp(
+            self.path_to('root'),
+            'sha256',
+            filter_options={'empty_dirs': True}
+        )
+        expected_dirhash = hashlib.sha256(''.encode('utf-8')).hexdigest()
+        assert dirhash_ == expected_dirhash
 
     def test_include_empty(self):
         self.mkdirs('root/d1')
@@ -542,9 +582,14 @@ class Testdirhash(TempDirTest):
         self.mkfile('root/d1/f')
 
         args = (self.path_to('root'), 'sha256')
-        dirhash = dirhash_mp_comp(*args, include_empty=False)
-        dirhash_empty = dirhash_mp_comp(*args, include_empty=True)
-        assert dirhash != dirhash_empty
+        dirhash_ = dirhash_mp_comp(
+            *args,
+            filter_options={'empty_dirs': False})
+        dirhash_empty = dirhash_mp_comp(
+            *args,
+            filter_options={'empty_dirs': True}
+        )
+        assert dirhash_ != dirhash_empty
 
     def test_chunksize(self):
         self.mkdirs('root')
@@ -552,12 +597,13 @@ class Testdirhash(TempDirTest):
 
         hash_value = dirhash_mp_comp(self.path_to('root'), 'sha256')
         for chunk_size in [2**4, 2**8, 2**16]:
-            assert (
-                dirhash_mp_comp(self.path_to('root'), 'sha256', chunk_size=chunk_size) ==
-                hash_value
-            )
+            assert dirhash_mp_comp(
+                self.path_to('root'),
+                'sha256',
+                chunk_size=chunk_size
+            ) == hash_value
 
-    def test_content_only(self):
+    def test_data_only(self):
         self.mkdirs('root1')
         self.mkfile('root1/a.txt', 'abc')
         self.mkfile('root1/b.txt', 'def')
@@ -569,13 +615,18 @@ class Testdirhash(TempDirTest):
         hash2 = dirhash_mp_comp(self.path_to('root2'), 'sha256')
         assert hash1 != hash2
 
-        # with `content_only` hash remains the same as long as order of files is the
-        # same (based on sorting of file paths)
-        chash1 = dirhash_mp_comp(self.path_to('root1'), 'sha256', content_only=True)
-        chash2 = dirhash_mp_comp(self.path_to('root2'), 'sha256', content_only=True)
-        assert chash1 == chash2
+        # with entry hash remains the same as long as order of files is the
+        # same
+        [dhash1, dhash2] = [
+            dirhash_mp_comp(
+                self.path_to(root),
+                'sha256',
+                protocol_options={'entry_properties': ['data']}
+            ) for root in ['root1', 'root2']
+        ]
+        assert dhash1 == dhash2
 
-    def test_paths_only(self):
+    def test_name_only(self):
         self.mkdirs('root1')
         self.mkfile('root1/a.txt', 'abc')
         self.mkfile('root1/b.txt', 'def')
@@ -587,61 +638,87 @@ class Testdirhash(TempDirTest):
         hash2 = dirhash_mp_comp(self.path_to('root2'), 'sha256')
         assert hash1 != hash2
 
-        chash1 = dirhash_mp_comp(self.path_to('root1'), 'sha256', paths_only=True)
-        chash2 = dirhash_mp_comp(self.path_to('root2'), 'sha256', paths_only=True)
-        assert chash1 == chash2
+        [dhash1, dhash2] = [
+            dirhash_mp_comp(
+                self.path_to(root),
+                'sha256',
+                protocol_options={'entry_properties': ['name']}
+            ) for root in ['root1', 'root2']
+        ]
+        assert dhash1 == dhash2
 
-    def test_raise_on_content_only_and_paths_only(self):
+    def test_is_link_property(self):
         self.mkdirs('root1')
         self.mkfile('root1/a.txt', 'abc')
-        dirhash_mp_comp(self.path_to('root1'), 'sha256')  # ok!
+        self.mkfile('root1/b.txt', 'def')
+        self.mkdirs('root2')
+        self.mkfile('b_target', 'def')
+        self.mkfile('root2/a.txt', 'abc')
+        self.symlink('b_target', 'root2/b.txt')
+
+        hash1 = dirhash_mp_comp(self.path_to('root1'), 'sha256')
+        hash2 = dirhash_mp_comp(self.path_to('root2'), 'sha256')
+        assert hash1 == hash2
+
+        for entry_properties in [
+            ['name', 'data', 'is_link'],
+            ['name', 'is_link'],
+            ['data', 'is_link'],
+        ]:
+            [hash1, hash2] = [
+                dirhash_mp_comp(
+                    self.path_to(root),
+                    'sha256',
+                    protocol_options={'entry_properties': entry_properties}
+                ) for root in ['root1', 'root2']
+            ]
+            assert hash1 != hash2
+
+    def test_raise_on_not_at_least_one_of_name_and_data(self):
+        self.mkdirs('root1')
+        self.mkfile('root1/a.txt', 'abc')
+        dirhash_mp_comp(self.path_to('root1'), 'sha256')  # check ok
         with pytest.raises(ValueError):
             dirhash_mp_comp(
                 self.path_to('root1'),
                 'sha256',
-                content_only=True,
-                paths_only=True
+                protocol_options={'entry_properties': []}
             )
 
-    def test_collision_attempt(self):
-        self.mkdirs('root1')
-        self.mkfile('root1/ab')
-        self.mkfile('root1/c')
-        hash1 = dirhash_mp_comp(self.path_to('root1'), 'sha256')
+        with pytest.raises(ValueError):
+            dirhash_mp_comp(
+                self.path_to('root1'),
+                'sha256',
+                protocol_options={'entry_properties': ['is_link']}
+            )
 
-        self.mkdirs('root2')
-        self.mkfile('root2/a')
-        self.mkfile('root2/bc')
-        hash2 = dirhash_mp_comp(self.path_to('root2'), 'sha256')
-
-        assert not hash1 == hash2
-
-    def test_ignorefile(self):
-        self.mkdirs('root1')
-        self.mkdirs('root2')
-        for fname in ['a', '.b', 'c.txt']:
-            self.mkfile(os.path.join('root1', fname))
-            self.mkfile(os.path.join('root2', fname))
-
-        ignorefile = (
-            '# my dirhash ignore patterns\n'
-            '.*\n'
-        )
-        self.mkfile('root1/.dirhashignore', ignorefile)
-        assert (
-            dirhash_mp_comp(self.path_to('root1'), 'sha256') ==
-            dirhash_mp_comp(self.path_to('root2'), 'sha256', ignore=['.*'])
-        )
-        assert (
-            dirhash_mp_comp(self.path_to('root1'), 'sha256', ignore=['*.txt']) ==
-            dirhash_mp_comp(self.path_to('root2'), 'sha256', ignore=['.*', '*.txt'])
-        )
-        # ignore file should _not_ be ignored by default:
-        self.mkfile('root1/.dirhashignore', '# empty ignorefile')
-        assert (
-            dirhash_mp_comp(self.path_to('root1'), 'sha256') !=
-            dirhash_mp_comp(self.path_to('root2'), 'sha256')
-        )
+    # TODO remove?
+    # def test_ignorefile(self):
+    #     self.mkdirs('root1')
+    #     self.mkdirs('root2')
+    #     for fname in ['a', '.b', 'c.txt']:
+    #         self.mkfile(os.path.join('root1', fname))
+    #         self.mkfile(os.path.join('root2', fname))
+    #
+    #     ignorefile = (
+    #         '# my dirhash ignore patterns\n'
+    #         '.*\n'
+    #     )
+    #     self.mkfile('root1/.dirhashignore', ignorefile)
+    #     assert (
+    #         dirhash_mp_comp(self.path_to('root1'), 'sha256') ==
+    #         dirhash_mp_comp(self.path_to('root2'), 'sha256', ignore=['.*'])
+    #     )
+    #     assert (
+    #         dirhash_mp_comp(self.path_to('root1'), 'sha256', ignore=['*.txt']) ==
+    #         dirhash_mp_comp(self.path_to('root2'), 'sha256', ignore=['.*', '*.txt'])
+    #     )
+    #     # ignore file should _not_ be ignored by default:
+    #     self.mkfile('root1/.dirhashignore', '# empty ignorefile')
+    #     assert (
+    #         dirhash_mp_comp(self.path_to('root1'), 'sha256') !=
+    #         dirhash_mp_comp(self.path_to('root2'), 'sha256')
+    #     )
 
     def test_multiproc_speedup(self):
 
@@ -659,14 +736,89 @@ class Testdirhash(TempDirTest):
         assert elapsed_sequential > expected_min_elapsed
 
         start = time()
-        dirhash(self.path_to('root'), algorithm=SlowHasher, workers=num_files)
+        dirhash(self.path_to('root'), algorithm=SlowHasher, jobs=num_files)
         end = time()
         elapsed_muliproc = end - start
         assert elapsed_muliproc < expected_min_elapsed / 2  # at least half!
 
+    def test_cache_by_real_path_speedup(self, tmpdir):
+        num_links = 10
+
+        # reference run without links
+        root1 = tmpdir.join('root1')
+        root1.ensure(dir=True)
+        for i in range(num_links):
+            file_i = root1.join('file_{}'.format(i))
+            file_i.write('< one chunk content', ensure=True)
+
+        wait_time = SlowHasher.wait_time
+        expected_min_elapsed = wait_time * num_links
+        start = time()
+        dirhash(root1, algorithm=SlowHasher)
+        end = time()
+        elapsed_sequential = end - start
+        assert elapsed_sequential > expected_min_elapsed
+        overhead = elapsed_sequential - expected_min_elapsed
+
+        # all links to same file
+        root2 = tmpdir.join('root2')
+        root2.ensure(dir=True)
+        target_file = tmpdir.join('target_file')
+        target_file.ensure()
+        for i in range(num_links):
+            root2.join('link_{}'.format(i)).mksymlinkto(target_file)
+
+        overhead_margin_factor = 1.5
+        expected_max_elapsed = overhead * overhead_margin_factor + wait_time
+        assert expected_max_elapsed < expected_min_elapsed
+        start = time()
+        dirhash(root2, algorithm=SlowHasher)
+        end = time()
+        elapsed_cache = end - start
+        assert elapsed_cache < expected_max_elapsed
+
+    def test_cache_together_with_multiprocess_speedup(self, tmpdir):
+        target_file_names = ['target_file_1', 'target_file_2']
+        num_links_per_file = 10
+        num_links = num_links_per_file * len(target_file_names)
+
+        # reference run without links
+        root1 = tmpdir.join('root1')
+        root1.ensure(dir=True)
+        for i in range(num_links):
+            file_i = root1.join('file_{}'.format(i))
+            file_i.write('< one chunk content', ensure=True)
+
+        jobs = 2
+        wait_time = SlowHasher.wait_time
+        expected_min_elapsed = wait_time * num_links / jobs
+        start = time()
+        dirhash(root1, algorithm=SlowHasher, jobs=jobs)
+        end = time()
+        elapsed_sequential = end - start
+        assert elapsed_sequential > expected_min_elapsed
+        overhead = elapsed_sequential - expected_min_elapsed
+
+        root2 = tmpdir.join('root2')
+        root2.ensure(dir=True)
+        for i, target_file_name in enumerate(target_file_names):
+            target_file = tmpdir.join(target_file_name)
+            target_file.write('< one chunk content', ensure=True)
+            for j in range(num_links_per_file):
+                root2.join('link_{}_{}'.format(i, j)).mksymlinkto(target_file)
+
+        overhead_margin_factor = 1.5
+        expected_max_elapsed = overhead * overhead_margin_factor + wait_time * 2
+        assert expected_max_elapsed < expected_min_elapsed
+        start = time()
+        dirhash(root2, algorithm=SlowHasher, jobs=jobs)
+        end = time()
+        elapsed_mp_cache = end - start
+        assert elapsed_mp_cache < expected_max_elapsed
+
 
 class SlowHasher(object):
-    wait_time = 0.1
+    wait_time = 0.05
 
     def __init__(self, *args, **kwargs):
         pass
@@ -677,3 +829,15 @@ class SlowHasher(object):
 
     def hexdigest(self):
         return ''
+
+
+class IdentityHasher(object):
+
+    def __init__(self, initial_data=b''):
+        self.datas = [initial_data.decode('utf-8')]
+
+    def update(self, data):
+        self.datas.append(data.decode('utf-8'))
+
+    def hexdigest(self):
+        return ''.join(self.datas)
