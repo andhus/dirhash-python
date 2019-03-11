@@ -400,7 +400,6 @@ class TestTraverse(object):
 
         tree_default = traverse(root)
         tree_empty_true = traverse(root, include_empty=True)
-        tree_empty_false = traverse(root, include_empty=False)
 
         def rp(relative):
             recursion_path = RecursionPath.from_root(root.join(relative))
@@ -413,11 +412,12 @@ class TestTraverse(object):
             path=rp(''),
             directories=[DirNode(path=rp('d1'))]
         )
-        tree_empty_false_expected = DirNode(path=rp(''))
 
         assert tree_default == tree_empty_true_expected
         assert tree_empty_true == tree_empty_true_expected
-        assert tree_empty_false == tree_empty_false_expected
+
+        with pytest.raises(ValueError):
+            traverse(root, include_empty=False)
 
     def test_multiprocess_speedup(self, tmpdir):
         num_files = 10

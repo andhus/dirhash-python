@@ -49,6 +49,10 @@ def traverse(  # TODO rename scantree
         include_empty=include_empty,
         parents={path.real: path},
     )
+
+    if _is_empty_dir_node(root_dir_node) and not include_empty:
+        raise ValueError('{}: Nothing to hash'.format(directory))
+
     result = dir_apply(root_dir_node)
 
     return result
@@ -131,10 +135,7 @@ def _traverse_recursive(
     for subpath in filter_(path.scandir()):
         if subpath.is_dir():
             dir_node = _traverse_recursive(subpath, **fwd_kwargs)
-            if (  # linked dirs does not implement `empty`
-                isinstance(dir_node, LinkedDir) or
-                include_empty or not dir_node.empty
-            ):
+            if include_empty or not _is_empty_dir_node(dir_node):
                 dirs.append(dir_apply(dir_node))
         if subpath.is_file():
             files.append(file_apply(subpath))
@@ -402,6 +403,10 @@ class CyclicLinkedDir(object):
 
     def apply(self, dir_apply, file_apply=None):
         return dir_apply(self)
+
+
+def _is_empty_dir_node(dir_node):
+    return isinstance(dir_node, DirNode) and dir_node.empty
 
 
 class RecursionFilter(object):
