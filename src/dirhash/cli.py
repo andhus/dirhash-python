@@ -3,7 +3,6 @@
 """
 from __future__ import print_function
 
-import os
 import sys
 import argparse
 
@@ -185,6 +184,7 @@ def preprocess_kwargs(kwargs):
     kwargs['filter_options'] = filter_options
     kwargs['protocol_options'] = protocol_options
 
+    # TODO remove!?
     # remote_ignorefile = os.environ.get('DIRHASH_IGNORE', None)
     # root_ignorefile_path = os.path.join(kwargs['directory'], dirhash.ignorefilename)
     # if os.path.exists(root_ignorefile_path):

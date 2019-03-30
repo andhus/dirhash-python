@@ -7,8 +7,6 @@ import tempfile
 from time import sleep, time
 
 import pytest
-from pathspec import RecursionError
-from py._path.local import LocalPath
 
 from dirhash import (
     _get_hasher_factory,
@@ -18,7 +16,7 @@ from dirhash import (
     algorithms_available,
     algorithms_guaranteed,
 )
-from dirhash.traverse import SymlinkRecursionError
+from scantree import SymlinkRecursionError
 
 
 class TestGetHasherFactory(object):
@@ -691,34 +689,6 @@ class Testdirhash(TempDirTest):
                 'sha256',
                 protocol_options={'entry_properties': ['is_link']}
             )
-
-    # TODO remove?
-    # def test_ignorefile(self):
-    #     self.mkdirs('root1')
-    #     self.mkdirs('root2')
-    #     for fname in ['a', '.b', 'c.txt']:
-    #         self.mkfile(os.path.join('root1', fname))
-    #         self.mkfile(os.path.join('root2', fname))
-    #
-    #     ignorefile = (
-    #         '# my dirhash ignore patterns\n'
-    #         '.*\n'
-    #     )
-    #     self.mkfile('root1/.dirhashignore', ignorefile)
-    #     assert (
-    #         dirhash_mp_comp(self.path_to('root1'), 'sha256') ==
-    #         dirhash_mp_comp(self.path_to('root2'), 'sha256', ignore=['.*'])
-    #     )
-    #     assert (
-    #         dirhash_mp_comp(self.path_to('root1'), 'sha256', ignore=['*.txt']) ==
-    #         dirhash_mp_comp(self.path_to('root2'), 'sha256', ignore=['.*', '*.txt'])
-    #     )
-    #     # ignore file should _not_ be ignored by default:
-    #     self.mkfile('root1/.dirhashignore', '# empty ignorefile')
-    #     assert (
-    #         dirhash_mp_comp(self.path_to('root1'), 'sha256') !=
-    #         dirhash_mp_comp(self.path_to('root2'), 'sha256')
-    #     )
 
     def test_multiproc_speedup(self):
 

@@ -14,9 +14,12 @@ import pkg_resources
 from functools import partial
 from multiprocessing import Pool
 
-from dirhash.traverse import CyclicLinkedDir, traverse, RecursionFilter
-
-from dirhash.compat import fspath
+from scantree import (
+    scantree,
+    RecursionFilter,
+    CyclicLinkedDir,
+)
+from scantree.compat import fspath
 
 
 __version__ = pkg_resources.require("dirhash")[0].version
@@ -39,6 +42,11 @@ def dirhash(
     allow_cyclic_links = protocol.on_cyclic_link != protocol.OnCyclicLink.RAISE
 
     def dir_apply(dir_node):
+        if not filter_.empty_dirs:
+            if dir_node.path.relative == '' and dir_node.empty:
+                # only check if root node is empty (other empty dirs are filter
+                # before `dir_apply` with `filter_.empty_dirs=False`)
+                raise ValueError('{}: Nothing to hash'.format(directory))
         descriptor = protocol.get_descriptor(dir_node)
         _dirhash = hasher_factory(descriptor.encode('utf-8')).hexdigest()
 
@@ -55,7 +63,7 @@ def dirhash(
                 cache=cache
             )
 
-        _, dirhash_ = traverse(
+        _, dirhash_ = scantree(
             directory,
             recursion_filter=filter_,
             file_apply=file_apply,
@@ -73,7 +81,7 @@ def dirhash(
             real_paths.add(path.real)
             return path
 
-        root_node = traverse(
+        root_node = scantree(
             directory,
             recursion_filter=filter_,
             file_apply=extract_real_paths,
@@ -249,7 +257,7 @@ def get_included_paths(
     filter_ = Filter.from_options(filter_options)
     allow_cyclic_links = protocol.on_cyclic_link != protocol.OnCyclicLink.RAISE
 
-    leafpaths = traverse(
+    leafpaths = scantree(
         directory,
         recursion_filter=filter_,
         follow_links=True,
@@ -433,7 +441,7 @@ def _get_filehash(filepath, hasher_factory, chunk_size, cache=None):
     return hasher.hexdigest()
 
 
-def _get_match_spec(  # TODO rename get_match_patterns
+def _get_match_spec(  # TODO rename get_match_patterns and make public
     match=None,
     ignore=None,
     ignore_extensions=None,
@@ -468,16 +476,3 @@ def _get_match_spec(  # TODO rename get_match_patterns
         return dd_items
 
     return deduplicate(match_spec)
-
-
-# def _parse_ignorefile(directory):
-#     """Parse ignore file in `directory` (if exists) and return a list of ignore
-#     patterns."""
-#     ignorefilepath = os.path.join(directory, ignorefilename)
-#     if not os.path.exists(ignorefilepath):
-#         return []
-#
-#     with open(ignorefilepath) as f:
-#         ignore = [p for p in f.read().splitlines() if not p.startswith('#')]
-#
-#     return ignore
