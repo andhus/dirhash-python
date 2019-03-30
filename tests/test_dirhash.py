@@ -709,7 +709,8 @@ class Testdirhash(TempDirTest):
         dirhash(self.path_to('root'), algorithm=SlowHasher, jobs=num_files)
         end = time()
         elapsed_muliproc = end - start
-        assert elapsed_muliproc < expected_min_elapsed / 2  # at least half!
+        assert elapsed_muliproc < expected_min_elapsed
+        # just check "any speedup", the overhead varies (and is high on Travis)
 
     def test_cache_by_real_path_speedup(self, tmpdir):
         num_links = 10
