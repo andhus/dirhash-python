@@ -142,6 +142,9 @@ class Protocol(object):
         options = {NAME, DATA, IS_LINK}
         _DIRHASH = 'dirhash'
 
+    _entry_property_separator = '\000'
+    _entry_descriptor_separator = '\000\000'
+
     def __init__(
         self,
         entry_properties=('name', 'data'),
@@ -181,15 +184,15 @@ class Protocol(object):
                 self._get_entry_properties(path, entry_hash)
             ) for path, entry_hash in entries
         ]
-        return '\n'.join(sorted(entry_descriptors) + [''])
+        return self._entry_descriptor_separator.join(sorted(entry_descriptors))
 
-    @staticmethod
-    def _get_entry_descriptor(entry_properties):
+    @classmethod
+    def _get_entry_descriptor(cls, entry_properties):
         entry_strings = [
             '{}:{}'.format(name, value)
             for name, value in entry_properties
         ]
-        return '\000'.join(sorted(entry_strings))
+        return cls._entry_property_separator.join(sorted(entry_strings))
 
     def _get_entry_properties(self, path, entry_hash):
         properties = []

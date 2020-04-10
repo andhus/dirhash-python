@@ -435,7 +435,7 @@ def dirhash_mp_comp(*args, **kwargs):
     return res
 
 
-class Testdirhash(TempDirTest):
+class TestDirhash(TempDirTest):
 
     def test_guaranteed_algorithms(self):
         self.mkdirs('root/d1/d11')
@@ -446,18 +446,18 @@ class Testdirhash(TempDirTest):
         self.mkfile('root/d2/f1', 'd')
 
         for algorithm, expected_hash in [
-            ('md5', 'cee9cf7d29f773f9df18a6712c54a7f2'),
-            ('sha1', 'fc5256658bb21111d5d1a9879e6c2ce0fd00f713'),
-            ('sha224', '7d8961337c06b27ba00baedd5587fb1f956cfb969d22497cee8651d5'),
-            ('sha256', '785d448a0b92d4b87502e7c95951532d'
-                       '41283362a5d36437769eb8351cab11c9'),
-            ('sha384', 'deaae2d70c6d930eb30ca69d9f5ad110'
-                       '0678de99743943eb627d378073a0896c'
-                       'ab4d65129446ad16430abee4209cdee5'),
-            ('sha512', '67e0334bf8d692c09b658c03fac7b515'
-                       '4cd7171fd7672b150e505538ec634f30'
-                       'c392aeaf2fe4cb8b2de1e7acc60c6ea51'
-                       'd2e6284b1be30453ede0e87ef120044')
+            ('md5', '3c631c7f5771468a2187494f802fad8f'),
+            ('sha1', '992aa2d00d2ed94f0c19eff7f151f5c6a7e0cc41'),
+            ('sha224', '18013e1df933d5781b2eddb94aceeb7ab689643f1df24060fb478999'),
+            ('sha256', 'ef7e95269fbc0e3478ad31fddd1c7d08'
+                       '907d189c61725332e8a2fd14448fe175'),
+            ('sha384', '64ef4360c172bc68250f9326ea231cd1'
+                       '46a7fa1afe9d386cee0cae0e9f1b4ad2'
+                       '1df050d1df436cff792bbe81d6698026'),
+            ('sha512', '7854226eb0278bc136056998890a8399'
+                       'f85ca383f7c54665026358d28b5dc716'
+                       '0ec654d2bcebf5d60974f82ed820600d'
+                       '8e807ea53d57578d076ec1c82f501208')
         ]:
             hash_value = dirhash_mp_comp(self.path_to('root'), algorithm)
             assert hash_value == expected_hash
@@ -470,11 +470,11 @@ class Testdirhash(TempDirTest):
 
         f1_desc = 'data:a\000name:f1'
         f12_desc = 'data:b\000name:f12'
-        d1_desc = 'dirhash:{}\000name:d1'.format(f12_desc + '\n')
+        d1_desc = 'dirhash:{}\000name:d1'.format(f12_desc)
         d2_desc = 'dirhash:\000name:d2'
 
-        empty_dirs_false_expected = '\n'.join([f1_desc, d1_desc, ''])
-        empty_dirs_true_expected = '\n'.join([f1_desc, d2_desc, d1_desc, ''])
+        empty_dirs_false_expected = '\000\000'.join([f1_desc, d1_desc])
+        empty_dirs_true_expected = '\000\000'.join([f1_desc, d2_desc, d1_desc])
 
         empty_dirs_false = dirhash(
             self.path_to('root'),

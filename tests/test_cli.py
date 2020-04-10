@@ -220,15 +220,15 @@ class TestCLI(object):
         [
             ('. -a md5',
              {'algorithm': 'md5'},
-             ['ba33eb4db4635e13869a16da6370000c',
-              '3399d0283d9c0806b9c17e78ab8b1370',
-              '1cc055682c4534de503b4d2aee268116']
+             ['594c48dde0776b03eddeeb0232190be7',
+              'd8ab965636d48e407b73b9dbba4cb928',
+              '050e7bc9ffcb09c15186c04e0f8026df']
              ),
             ('. -a sha256',
              {'algorithm': 'sha256'},
-             ['a06f832d280c4f75b6d5486a6590c5d5ac93540e491bcd9f563729375125a2c4',
-              '743a273e5076d7e38d5da8e2bdb1addcb90ac281f023ed053b9d09a2d1ce139e',
-              'a98fb1523b52800a3fa9a7629c4fccfb914e4d91150a10f9328fd2a06463eff4']),
+             ['23a04964149889e932ba3348fe22442f4f6a3b3fec616a386a70579ee857ab7b',
+              '7b76bac43e963f9561f37b96b92d7a174094bff230c6efbf1d8bf650e8b40b7a',
+              '7156da2b2e5a2926eb4b72e65f389343cb6aca0578f0aedcd6f7457abd67d8f5']),
         ]
     )
     def test_hash_result(self, argstring, kwargs, expected_hashes, tmpdir):
