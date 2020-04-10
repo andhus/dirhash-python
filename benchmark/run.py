@@ -117,7 +117,7 @@ def get_reference_shell_cmd(dirpath, algorithm):
 
 
 def get_dirhash_shell_cmd(dirpath, algorithm, workers=1):
-    return 'dirhash {} -a {} -w {}'.format(dirpath, algorithm, workers)
+    return 'dirhash {} -a {} -j {}'.format(dirpath, algorithm, workers)
 
 
 def benchmark(dirpath, algorithm, **kwargs):
