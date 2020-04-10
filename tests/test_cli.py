@@ -88,28 +88,28 @@ class TestCLI(object):
             # Filtering options
             (
                 '. -a md5 -m "* !.*"',
-                {'filter_options': {'match_patterns': ['*', '!.*']}}
+                {'filtering': {'match_patterns': ['*', '!.*']}}
             ),
             (
                 '. -a md5 --match "d1/* d2/*" --ignore "*.txt"',
-                {'filter_options': {'match_patterns': ['d1/*', 'd2/*', '!*.txt']}}
+                {'filtering': {'match_patterns': ['d1/*', 'd2/*', '!*.txt']}}
             ),
             (
                 '. -a md5 --empty-dirs',
-                {'filter_options': {'empty_dirs': True}}
+                {'filtering': {'empty_dirs': True}}
             ),
             (
                 '. -a md5 --no-linked-dirs',
-                {'filter_options': {'linked_dirs': False}}
+                {'filtering': {'linked_dirs': False}}
             ),
             (
                 '. -a md5 --no-linked-files',
-                {'filter_options': {'linked_files': False}}
+                {'filtering': {'linked_files': False}}
             ),
             # Protocol options
             (
                 '. -a md5 --allow-cyclic-links',
-                {'protocol_options': {'on_cyclic_link': 'hash_reference'}}
+                {'protocol': {'on_cyclic_link': 'hash_reference'}}
             ),
             # Implementation
             (
@@ -124,24 +124,24 @@ class TestCLI(object):
     )
     def test_get_kwargs(self, argstring, non_default_kwargs):
         from dirhash.cli import get_kwargs
-        filter_options = {
+        filter_kwargs = {
             'match_patterns': ['*'],
             'empty_dirs': False,
             'linked_dirs': True,
             'linked_files': True
         }
-        protocol_options = {
+        protocol_kwargs = {
             'entry_properties': ['data', 'name'],
             'on_cyclic_link': 'raise'
         }
-        filter_options.update(non_default_kwargs.pop('filter_options', {}))
-        protocol_options.update(non_default_kwargs.pop('protocol_options', {}))
+        filter_kwargs.update(non_default_kwargs.pop('filtering', {}))
+        protocol_kwargs.update(non_default_kwargs.pop('protocol', {}))
         kwargs = {
             'list': False,
             'directory': '.',
             'algorithm': 'md5',
-            'filter_options': filter_options,
-            'protocol_options': protocol_options,
+            'filtering': filter_kwargs,
+            'protocol': protocol_kwargs,
             'chunk_size': 2 ** 20,
             'jobs': 1
         }
@@ -240,8 +240,8 @@ class TestCLI(object):
                 ['', ' -p data', ' -p name'],
                 [
                     {},
-                    {'protocol_options': {'entry_properties': ['data']}},
-                    {'protocol_options': {'entry_properties': ['name']}},
+                    {'protocol': {'entry_properties': ['data']}},
+                    {'protocol': {'entry_properties': ['name']}},
                 ],
                 expected_hashes
             ):

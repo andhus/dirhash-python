@@ -192,13 +192,13 @@ class TestGetIncludedPaths(TempDirTest):
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            filter_options={'linked_files': True}
+            filtering={'linked_files': True}
         )
         assert filepaths == ['f1', 'f2']
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            filter_options={'linked_files': False}
+            filtering={'linked_files': False}
         )
         assert filepaths == ['f1']
 
@@ -216,13 +216,13 @@ class TestGetIncludedPaths(TempDirTest):
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            filter_options={'linked_dirs': False}
+            filtering={'linked_dirs': False}
         )
         assert filepaths == ['f1']
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            filter_options={'linked_dirs': True}
+            filtering={'linked_dirs': True}
         )
         assert filepaths == ['d1/f1', 'd1/f2', 'f1']
 
@@ -236,7 +236,7 @@ class TestGetIncludedPaths(TempDirTest):
         with pytest.raises(SymlinkRecursionError) as exc_info:
             get_included_paths(
                 self.path_to('root'),
-                protocol_options={'on_cyclic_link': 'raise'}
+                protocol={'on_cyclic_link': 'raise'}
             )
         assert exc_info.value.real_path == os.path.realpath(self.path_to('root'))
         assert exc_info.value.first_path == self.path_to('root/')
@@ -245,7 +245,7 @@ class TestGetIncludedPaths(TempDirTest):
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            protocol_options={'on_cyclic_link': 'hash_reference'}
+            protocol={'on_cyclic_link': 'hash_reference'}
         )
         assert filepaths == ['d1/link_back/.']
 
@@ -270,7 +270,7 @@ class TestGetIncludedPaths(TempDirTest):
         # with ignore
         filepaths = get_included_paths(
             self.path_to('root'),
-            filter_options={'match_patterns': ['*', '!.*']}
+            filtering={'match_patterns': ['*', '!.*']}
         )
         assert filepaths == ['.d2/f1', 'd1/f1', 'f1']
 
@@ -291,7 +291,7 @@ class TestGetIncludedPaths(TempDirTest):
         # with ignore
         filepaths = get_included_paths(
             self.path_to('root'),
-            filter_options={'match_patterns': ['*', '!.*/']}
+            filtering={'match_patterns': ['*', '!.*/']}
         )
         assert filepaths == ['.f2', 'd1/.f2', 'd1/f1', 'f1']
 
@@ -312,7 +312,7 @@ class TestGetIncludedPaths(TempDirTest):
         # using ignore
         filepaths = get_included_paths(
             self.path_to('root'),
-            filter_options={'match_patterns': ['*', '!.*/', '!.*']}
+            filtering={'match_patterns': ['*', '!.*/', '!.*']}
         )
         assert filepaths == ['d1/f1', 'f1']
 
@@ -332,7 +332,7 @@ class TestGetIncludedPaths(TempDirTest):
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            filter_options={'match_patterns': ['*', '!*.skip1', '!*.skip2']}
+            filtering={'match_patterns': ['*', '!*.skip1', '!*.skip2']}
         )
         assert filepaths == [
             'd1/f.txt', 'f', 'f.skip1.txt', 'f.skip1skip2', 'f.txt', 'fskip1']
@@ -348,7 +348,7 @@ class TestGetIncludedPaths(TempDirTest):
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            filter_options={'empty_dirs': False}
+            filtering={'empty_dirs': False}
         )
         assert filepaths == ['d1/f', 'd3/d31/f']
 
@@ -358,7 +358,7 @@ class TestGetIncludedPaths(TempDirTest):
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            filter_options={'empty_dirs': True}
+            filtering={'empty_dirs': True}
         )
         assert filepaths == ['d1/f', 'd2/.', 'd3/d31/f', 'd4/d41/.']
 
@@ -371,7 +371,7 @@ class TestGetIncludedPaths(TempDirTest):
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            filter_options={
+            filtering={
                 'match_patterns': ['*', '!.*'],
                 'empty_dirs': False
             }
@@ -381,13 +381,13 @@ class TestGetIncludedPaths(TempDirTest):
         # `include_empty=False` is default
         filepaths = get_included_paths(
             self.path_to('root'),
-            filter_options={'match_patterns': ['*', '!.*']},
+            filtering={'match_patterns': ['*', '!.*']},
         )
         assert filepaths == ['d1/f']
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            filter_options={
+            filtering={
                 'match_patterns': ['*', '!.*'],
                 'empty_dirs': True
             }
@@ -402,7 +402,7 @@ class TestGetIncludedPaths(TempDirTest):
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            filter_options={
+            filtering={
                 'match_patterns': ['*', '!.*'],
                 'empty_dirs': True
             }
@@ -411,7 +411,7 @@ class TestGetIncludedPaths(TempDirTest):
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            filter_options={
+            filtering={
                 'match_patterns': ['*', '!.*/'],
                 'empty_dirs': True
             }
@@ -420,7 +420,7 @@ class TestGetIncludedPaths(TempDirTest):
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            filter_options={
+            filtering={
                 'match_patterns': ['*', '!d1'],
                 'empty_dirs': True
             }
@@ -485,7 +485,7 @@ class Testdirhash(TempDirTest):
         empty_dirs_true = dirhash(
             self.path_to('root'),
             algorithm=IdentityHasher,
-            filter_options={'empty_dirs': True}
+            filtering={'empty_dirs': True}
         )
         assert empty_dirs_true == empty_dirs_true_expected
 
@@ -504,7 +504,7 @@ class Testdirhash(TempDirTest):
         )
         root1_linked_files_false = dirhash_mp_comp(
             self.path_to('root1'), algorithm='md5',
-            filter_options={'linked_files': False}
+            filtering={'linked_files': False}
         )
 
         root2 = dirhash_mp_comp(
@@ -531,12 +531,12 @@ class Testdirhash(TempDirTest):
         root1_linked_dirs_true = dirhash_mp_comp(
             self.path_to('root1'),
             algorithm='md5',
-            filter_options={'linked_dirs': True}
+            filtering={'linked_dirs': True}
         )
         root1_linked_dirs_false = dirhash_mp_comp(
             self.path_to('root1'),
             algorithm='md5',
-            filter_options={'linked_dirs': False}
+            filtering={'linked_dirs': False}
         )
         root2 = dirhash_mp_comp(
             self.path_to('root2'), algorithm='md5'
@@ -569,7 +569,7 @@ class Testdirhash(TempDirTest):
         dirhash_ = dirhash_mp_comp(
             self.path_to('root'),
             'sha256',
-            filter_options={'empty_dirs': True}
+            filtering={'empty_dirs': True}
         )
         expected_dirhash = hashlib.sha256(''.encode('utf-8')).hexdigest()
         assert dirhash_ == expected_dirhash
@@ -582,10 +582,10 @@ class Testdirhash(TempDirTest):
         args = (self.path_to('root'), 'sha256')
         dirhash_ = dirhash_mp_comp(
             *args,
-            filter_options={'empty_dirs': False})
+            filtering={'empty_dirs': False})
         dirhash_empty = dirhash_mp_comp(
             *args,
-            filter_options={'empty_dirs': True}
+            filtering={'empty_dirs': True}
         )
         assert dirhash_ != dirhash_empty
 
@@ -619,7 +619,7 @@ class Testdirhash(TempDirTest):
             dirhash_mp_comp(
                 self.path_to(root),
                 'sha256',
-                protocol_options={'entry_properties': ['data']}
+                protocol={'entry_properties': ['data']}
             ) for root in ['root1', 'root2']
         ]
         assert dhash1 == dhash2
@@ -640,7 +640,7 @@ class Testdirhash(TempDirTest):
             dirhash_mp_comp(
                 self.path_to(root),
                 'sha256',
-                protocol_options={'entry_properties': ['name']}
+                protocol={'entry_properties': ['name']}
             ) for root in ['root1', 'root2']
         ]
         assert dhash1 == dhash2
@@ -667,7 +667,7 @@ class Testdirhash(TempDirTest):
                 dirhash_mp_comp(
                     self.path_to(root),
                     'sha256',
-                    protocol_options={'entry_properties': entry_properties}
+                    protocol={'entry_properties': entry_properties}
                 ) for root in ['root1', 'root2']
             ]
             assert hash1 != hash2
@@ -680,14 +680,14 @@ class Testdirhash(TempDirTest):
             dirhash_mp_comp(
                 self.path_to('root1'),
                 'sha256',
-                protocol_options={'entry_properties': []}
+                protocol={'entry_properties': []}
             )
 
         with pytest.raises(ValueError):
             dirhash_mp_comp(
                 self.path_to('root1'),
                 'sha256',
-                protocol_options={'entry_properties': ['is_link']}
+                protocol={'entry_properties': ['is_link']}
             )
 
     def test_multiproc_speedup(self):

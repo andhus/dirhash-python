@@ -31,13 +31,13 @@ algorithms_available = hashlib.algorithms_available
 def dirhash(
     directory,
     algorithm,
-    filter_options=None,
-    protocol_options=None,
+    filtering=None,
+    protocol=None,
     chunk_size=2**20,
     jobs=1
 ):
-    filter_ = Filter.from_options(filter_options)
-    protocol = Protocol.from_options(protocol_options)
+    filter_ = get_instance('filtering', filtering, Filter)
+    protocol = get_instance('protocol', protocol, Protocol)
     hasher_factory = _get_hasher_factory(algorithm)
     allow_cyclic_links = protocol.on_cyclic_link != protocol.OnCyclicLink.RAISE
 
@@ -129,16 +129,6 @@ class Filter(RecursionFilter):
         )
         self.empty_dirs = empty_dirs
 
-    @classmethod
-    def from_options(cls, options):
-        if isinstance(options, Filter):
-            return options
-
-        if options is None:
-            options = {}
-
-        return cls(**options)
-
 
 class Protocol(object):
 
@@ -182,16 +172,6 @@ class Protocol(object):
                 '{}: not a valid on_cyclic_link option'.format(on_cyclic_link)
             )
         self.on_cyclic_link = on_cyclic_link
-
-    @classmethod
-    def from_options(cls, options):
-        if isinstance(options, Protocol):
-            return options
-
-        if options is None:
-            options = {}
-
-        return cls(**options)
 
     def get_descriptor(self, dir_node):
         if isinstance(dir_node, CyclicLinkedDir):
@@ -237,8 +217,8 @@ class Protocol(object):
 
 def get_included_paths(
     directory,
-    filter_options=None,
-    protocol_options=None
+    filtering=None,
+    protocol=None
 ):
     """Inspect what paths are included for the corresponding arguments to the
     `dirhash.dirhash` function.
@@ -253,8 +233,8 @@ def get_included_paths(
         A sorted list of the paths ([str]) that would be included in computing the
         hash of `directory` given the provided arguments.
     """
-    protocol = Protocol.from_options(protocol_options)
-    filter_ = Filter.from_options(filter_options)
+    protocol = get_instance('protocol', protocol, Protocol)
+    filter_ = get_instance('filtering', filtering, Filter)
     allow_cyclic_links = protocol.on_cyclic_link != protocol.OnCyclicLink.RAISE
 
     leafpaths = scantree(
@@ -397,6 +377,19 @@ _old_docs = """
         `include_empty`, `ignore_extensions` and `ignore_hidden` to get a list of all
         paths that will be included when computing the hash by this function.
     """
+
+
+def get_instance(argname, instance_or_kwargs, cls):
+    if instance_or_kwargs is None:
+        return cls()
+    if isinstance(instance_or_kwargs, dict):
+        return cls(**instance_or_kwargs)
+    if isinstance(instance_or_kwargs, cls):
+        return instance_or_kwargs
+    raise TypeError(
+        'argument {argname} must be an instance of, or kwargs for, '
+        '{cls}'.format(argname=argname, cls=cls)
+    )
 
 
 def _verify_is_directory(directory):

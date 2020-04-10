@@ -167,13 +167,13 @@ def preprocess_kwargs(kwargs):
         match_kwargs[kwarg] = kwargs.pop(kwarg)
     match_patterns = dirhash._get_match_spec(**match_kwargs)
 
-    filter_options = {
+    filtering_kwargs = {
         'match_patterns': match_patterns,
         'linked_dirs': kwargs.pop('linked_dirs'),
         'linked_files': kwargs.pop('linked_files'),
         'empty_dirs': kwargs.pop('empty_dirs'),
     }
-    protocol_options = {
+    protocol_kwargs = {
         'on_cyclic_link': (
             dirhash.Protocol.OnCyclicLink.HASH_REFERENCE
             if kwargs.pop('allow_cyclic_links')
@@ -181,8 +181,8 @@ def preprocess_kwargs(kwargs):
         ),
         'entry_properties': kwargs.pop('properties') or ["data", "name"]
     }
-    kwargs['filter_options'] = filter_options
-    kwargs['protocol_options'] = protocol_options
+    kwargs['filtering'] = filtering_kwargs
+    kwargs['protocol'] = protocol_kwargs
 
     # TODO remove!?
     # remote_ignorefile = os.environ.get('DIRHASH_IGNORE', None)
