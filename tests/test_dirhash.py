@@ -10,12 +10,12 @@ import pytest
 
 from dirhash import (
     _get_hasher_factory,
-    _get_match_spec,
+    get_match_patterns,
     get_included_paths,
     dirhash,
     algorithms_available,
     algorithms_guaranteed,
-)
+    Protocol, _parmap, Filter)
 from scantree import SymlinkRecursionError
 
 
@@ -74,55 +74,55 @@ class TestGetHasherFactory(object):
         assert hasher_factory is MockHasher
 
 
-class TestGetMatchSpec(object):
+class TestGetMatchPatterns(object):
 
     def test_default_match_all(self):
-        ms = _get_match_spec()
+        ms = get_match_patterns()
         assert ms == ['*']
 
     def test_only_match(self):
-        ms = _get_match_spec(match=['a*', 'b*'])
+        ms = get_match_patterns(match=['a*', 'b*'])
         assert ms == ['a*', 'b*']
 
     def test_only_ignore(self):
-        ms = _get_match_spec(ignore=['a*', 'b*'])
+        ms = get_match_patterns(ignore=['a*', 'b*'])
         assert ms == ['*', '!a*', '!b*']
 
     def test_match_and_ignore(self):
-        ms = _get_match_spec(match=['a*'], ignore=['*.ext'])
+        ms = get_match_patterns(match=['a*'], ignore=['*.ext'])
         assert ms == ['a*', '!*.ext']
 
     def test_ignore_hidden(self):
-        ms = _get_match_spec(ignore_hidden=True)
+        ms = get_match_patterns(ignore_hidden=True)
         assert ms == ['*', '!.*', '!.*/']
 
         # should not duplicate if present in (general) ignore
-        ms = _get_match_spec(ignore=['.*'], ignore_hidden=True)
+        ms = get_match_patterns(ignore=['.*'], ignore_hidden=True)
         assert ms == ['*', '!.*', '!.*/']
 
-        ms = _get_match_spec(ignore=['.*/'], ignore_hidden=True)
+        ms = get_match_patterns(ignore=['.*/'], ignore_hidden=True)
         assert ms == ['*', '!.*/', '!.*']
 
-        ms = _get_match_spec(ignore=['.*', '.*/'], ignore_hidden=True)
+        ms = get_match_patterns(ignore=['.*', '.*/'], ignore_hidden=True)
         assert ms == ['*', '!.*', '!.*/']
 
     def test_ignore_extensions(self):
-        ms = _get_match_spec(ignore_extensions=['.ext'])
+        ms = get_match_patterns(ignore_extensions=['.ext'])
         assert ms == ['*', '!*.ext']
 
         # automatically adds '.'
-        ms = _get_match_spec(ignore_extensions=['ext'])
+        ms = get_match_patterns(ignore_extensions=['ext'])
         assert ms == ['*', '!*.ext']
 
         # mixed also works
-        ms = _get_match_spec(ignore_extensions=['ext1', '.ext2'])
+        ms = get_match_patterns(ignore_extensions=['ext1', '.ext2'])
         assert ms == ['*', '!*.ext1', '!*.ext2']
 
         # should not duplicate if present in (general) ignore
-        ms = _get_match_spec(ignore=['*.ext'], ignore_extensions=['.ext'])
+        ms = get_match_patterns(ignore=['*.ext'], ignore_extensions=['.ext'])
         assert ms == ['*', '!*.ext']
 
-        ms = _get_match_spec(ignore=['*.ext'], ignore_extensions=['ext'])
+        ms = get_match_patterns(ignore=['*.ext'], ignore_extensions=['ext'])
         assert ms == ['*', '!*.ext']
 
 
@@ -787,6 +787,42 @@ class Testdirhash(TempDirTest):
         elapsed_mp_cache = end - start
         assert elapsed_mp_cache < expected_max_elapsed
 
+    def test_hash_cyclic_link_to_root(self):
+        self.mkdirs('root/d1')
+        self.symlink('root', 'root/d1/link_back')
+        dirhash(
+            self.path_to('root'),
+            'sha256',
+            protocol={'on_cyclic_link': 'hash_reference'}
+        )
+
+    def test_hash_cyclic_link(self):
+        self.mkdirs('root/d1/d2')
+        self.symlink('root/d1', 'root/d1/d2/link_back')
+        dirhash(
+            self.path_to('root'),
+            'sha256',
+            protocol={'on_cyclic_link': 'hash_reference'}
+        )
+
+    def test_pass_filtering_instance(self):
+        self.mkdirs('root')
+        self.mkfile('root/f1', '')
+        dirhash(self.path_to('root'), 'sha256', filtering=Filter())
+
+    def test_pass_protocol_instance(self):
+        self.mkdirs('root')
+        self.mkfile('root/f1', '')
+        dirhash(self.path_to('root'), 'sha256', protocol=Protocol())
+
+    def test_raise_on_wrong_type(self):
+        self.mkdirs('root')
+        self.mkfile('root/f1', '')
+        with pytest.raises(TypeError):
+            dirhash(self.path_to('root'), 'sha256', filtering='')
+        with pytest.raises(TypeError):
+            dirhash(self.path_to('root'), 'sha256', protocol='')
+
 
 class SlowHasher(object):
     wait_time = 0.05
@@ -812,3 +848,24 @@ class IdentityHasher(object):
 
     def hexdigest(self):
         return ''.join(self.datas)
+
+
+class TestProtocol(object):
+
+    def test_raise_for_invalid_entry_properties(self):
+        with pytest.raises(ValueError):
+            Protocol(entry_properties=['not-valid'])
+
+    def test_raise_for_invalid_on_cyclic_link(self):
+        with pytest.raises(ValueError):
+            Protocol(on_cyclic_link='not-valid')
+
+
+def mock_func(x):
+    return x * 2
+
+
+@pytest.mark.parametrize('jobs', [1, 2, 4])
+def test_parmap(jobs):
+    inputs = [1, 2, 3, 4]
+    assert _parmap(mock_func, inputs, jobs=jobs) == [2, 4, 6, 8]

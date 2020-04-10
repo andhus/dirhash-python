@@ -267,3 +267,9 @@ class TestCLI(object):
                 lib_hash = dirhash.dirhash(str(tmpdir), **full_kwargs)
 
                 assert cli_hash == cli_hash_mp == lib_hash == expected_hash
+
+    def test_error_bad_argument(self, tmpdir):
+        with tmpdir.as_cwd():
+            o, error, returncode = dirhash_run('. --chunk-size not_an_int')
+            assert returncode > 0
+            assert error != ''

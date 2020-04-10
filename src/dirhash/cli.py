@@ -20,7 +20,7 @@ def main():
                 print(leafpath)
         else:
             print(dirhash.dirhash(**kwargs))
-    except Exception as e:
+    except Exception as e:  # pragma: no cover (not picked up by coverage)
         sys.stderr.write('dirhash: {}\n'.format(e))
         sys.exit(1)
 
@@ -165,7 +165,7 @@ def preprocess_kwargs(kwargs):
     match_kwargs = {}
     for kwarg in ['match', 'ignore', 'ignore_extensions', 'ignore_hidden']:
         match_kwargs[kwarg] = kwargs.pop(kwarg)
-    match_patterns = dirhash._get_match_spec(**match_kwargs)
+    match_patterns = dirhash.get_match_patterns(**match_kwargs)
 
     filtering_kwargs = {
         'match_patterns': match_patterns,

@@ -19,8 +19,6 @@ from scantree import (
     RecursionFilter,
     CyclicLinkedDir,
 )
-from scantree.compat import fspath
-
 
 __version__ = pkg_resources.require("dirhash")[0].version
 
@@ -36,8 +34,8 @@ def dirhash(
     chunk_size=2**20,
     jobs=1
 ):
-    filter_ = get_instance('filtering', filtering, Filter)
-    protocol = get_instance('protocol', protocol, Protocol)
+    filter_ = _get_instance('filtering', filtering, Filter)
+    protocol = _get_instance('protocol', protocol, Protocol)
     hasher_factory = _get_hasher_factory(algorithm)
     allow_cyclic_links = protocol.on_cyclic_link != protocol.OnCyclicLink.RAISE
 
@@ -210,7 +208,12 @@ class Protocol(object):
     def _get_cyclic_linked_dir_descriptor(self, dir_node):
         relpath = dir_node.path.relative
         target_relpath = dir_node.target_path.relative
-        path_to_target = os.path.relpath(target_relpath, relpath)
+        path_to_target = os.path.relpath(
+            # the extra '.' is needed if link back to root, because
+            # an empty path ('') is not supported by os.path.relpath
+            os.path.join('.', target_relpath),
+            os.path.join('.', relpath)
+        )
         # TODO normalize posix!
         return path_to_target
 
@@ -233,8 +236,8 @@ def get_included_paths(
         A sorted list of the paths ([str]) that would be included in computing the
         hash of `directory` given the provided arguments.
     """
-    protocol = get_instance('protocol', protocol, Protocol)
-    filter_ = get_instance('filtering', filtering, Filter)
+    protocol = _get_instance('protocol', protocol, Protocol)
+    filter_ = _get_instance('filtering', filtering, Filter)
     allow_cyclic_links = protocol.on_cyclic_link != protocol.OnCyclicLink.RAISE
 
     leafpaths = scantree(
@@ -379,7 +382,7 @@ _old_docs = """
     """
 
 
-def get_instance(argname, instance_or_kwargs, cls):
+def _get_instance(argname, instance_or_kwargs, cls):
     if instance_or_kwargs is None:
         return cls()
     if isinstance(instance_or_kwargs, dict):
@@ -390,14 +393,6 @@ def get_instance(argname, instance_or_kwargs, cls):
         'argument {argname} must be an instance of, or kwargs for, '
         '{cls}'.format(argname=argname, cls=cls)
     )
-
-
-def _verify_is_directory(directory):
-    directory = fspath(directory)
-    if not os.path.exists(directory):
-        raise ValueError('{}: No such directory'.format(directory))
-    if not os.path.isdir(directory):
-        raise ValueError('{}: Is not a directory'.format(directory))
 
 
 def _get_filehash(filepath, hasher_factory, chunk_size, cache=None):
@@ -434,7 +429,7 @@ def _get_filehash(filepath, hasher_factory, chunk_size, cache=None):
     return hasher.hexdigest()
 
 
-def _get_match_spec(  # TODO rename get_match_patterns and make public
+def get_match_patterns(
     match=None,
     ignore=None,
     ignore_extensions=None,
