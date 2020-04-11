@@ -1,5 +1,11 @@
 # The Dirhash Standard
 
+[https://github.com/andhus/dirhash/DIRHASH_STANDARD.md](https://github.com/andhus/dirhash/DIRHASH_STANDARD.md
+)
+
+VERSION: 0.1.0
+
+
 ## Table of Content
 
 - [Introduction](#introduction)
@@ -59,7 +65,7 @@ Filtering governs what files and subdirectories to include. This is done by matc
 ### Filtering Options
 Name  | Type             | Default             | Description 
 ----  | ---------------- | ------------------- | -----------
-match_patterns | Array of Strings | `["*"]` (match all) | Wildcard matching. Path relative to the Dirhash root is matched against the provided patterns. The path must match at least one of the "match patterns" (*not* starting with `!`) and none of the "ignore patterns" (starting with `!`).
+match_patterns | Array of Strings | `["*"]` (match all) | [Glob/Wildcard matching](https://en.wikipedia.org/wiki/Glob_(programming)). The path *relative to the Dirhash root* is matched against the provided patterns. The path must match at least one of the "match patterns" (*not* starting with `!`) and none of the "ignore patterns" (starting with `!`).
 linked_dirs | Boolean | `true` | Include (i.e. follow) symbolic links to directories.
 linked_files | Boolean | `true` | Include symbolic links to files.
 empty_dirs | Boolean | `false` | Include empty directories. A directory is considered empty if it contains no files or directories to include *given the Filtering Options*.
@@ -68,30 +74,31 @@ empty_dirs | Boolean | `false` | Include empty directories. A directory is consi
 
 
 ## Protocol
-The `DIRHASH` of a directory is obtained by taking the underlying hash function's hexdigest of a `DIR-DESCRIPTOR` string. The `DIR-DESCRIPTOR` is composed by concatenation of an ordered sequence of `ENTRY-DESCRIPTOR`:s, each followed by a newline:
+The `DIRHASH` of a directory is obtained by taking the underlying hash function's hexdigest of a `DIR-DESCRIPTOR` string. The `DIR-DESCRIPTOR` is composed by concatenation of an ordered sequence of `ENTRY-DESCRIPTOR`:s, separated by two [null characters](https://en.wikipedia.org/wiki/Null_character):
 
-```<entry-descriptor>\n<entry-descriptor>...<entry-descriptor>\n```,
+```<entry-descriptor>\000\000[...]<entry-descriptor>```,
 
 in python:
 
 ```python
-dir_descriptor = '\n'.join(sorted(entry_descriptors) + [''])
+# entry_descriptors: List[str]
+dir_descriptor = '\000\000'.join(sorted(entry_descriptors))
 ```
 
 A *directory entry* is either a subdirectory, a file or a symbolic link. Other file types (named pipe, socket, device file, door) are excluded in the core version of the Dirhash Standard. No distinction is made between files and "hard links" to files.
 
-The `ENTRY-DESCRIPTOR` is composed by concatenation of an ordered sequence of entry properties separated by the [null character](https://en.wikipedia.org/wiki/Null_character) `\000`. Each property is represented by its name and value separated by a colon `:`:
+The `ENTRY-DESCRIPTOR` is composed by concatenation of an ordered sequence of entry properties separated by a single [null character](https://en.wikipedia.org/wiki/Null_character). Each property is represented by its name and value separated by a colon `:`:
 
-```<name>:<value>\000<name>:<value>...\000<name>:<value>```,
+```<name>:<value>\000[...]<name>:<value>```,
 
 in python:
 
 ```python
-entry_properties = {'property_1': 'value_1', ...}
-entry_property_strings = ['{}:{}'.format(k, v) for k, v in entry_properties.items()]
+# entry_properties: Dict[str, str]
+entry_property_strings = [f'{k}:{v}' for k, v in entry_properties.items()]
 entry_descriptor = '\000'.join(sorted(entry_property_strings))
 ```
-The null character is the only character not allowed in property names or values (to maintain collision resistance).
+The null character is (the only character) not allowed in property names or values according to the DIRHASH standard, to maintain [collision resistance](https://en.wikipedia.org/wiki/Collision_resistance).
 
 
 ### Entry Properties
@@ -102,7 +109,7 @@ Name  | Value | Inclusion | Comment/Rationale
 dirhash | The `DIRHASH` of a subdirectory or the target directory in case of a symbolic link, except for [cyclic links](#cyclic-links). | Always included for directories. *Not applicable to files*. | This is the recursive part of the Dirhash Protocol; the content of each subdirectory is summarized by its `DIRHASH`.
 data | Hash function hexdigest of the binary data of the file, or the file linked to, if a symlink. | Optional, but one of `name` and `data` must always be included. *Not applicable to directories*. | For the typical use case, the data should affect the hash. Without it, only the paths to files and subdirectories are hashed. 
 name | The name of the entry (the name of the link itself if a symlink, *not* the entry linked to). | Optional, but one of `name` and `data` must always be included. | For the typical use case, the entry name should affect the hash, so that data and other metadata is tied to the name and, subsequently, to the entry's relative path to the Dirhash root (which follows from the recursive nature of the Dirhash Standard).
-is_link | Whether the entry is a symlink; `true` or `false`. | Optional. | For the typical use case, it does *not* matter if a file or directory is linked or not - the file tree is "perceived the same" for many applications. If it matters, this property can be included. 
+is_link | Whether the entry is a symlink, one of `"true"` or `"false"`. | Optional. | For the typical use case, it does *not* matter if a file or directory is linked or not - the file tree is "perceived the same" for many applications. If it matters, this property can be included. 
 
 
 ### Cyclic Links
@@ -139,7 +146,7 @@ The Dirhash Protocol is designed so that the same hash should not be obtained wi
 
 
 ## The `DIRSUM` Object
-Checksums based on the `DIRSHASH` must contain the additional configuration options to be properly validated (as was discussed in the [Introduction](#introduction)). For this purpose, the Dirhash Standard provides the `DIRSUM` object which contains all the necessary information for verification. It's structure is laid out in JSON below, with properties according [Hash Function](#hash-function-options), [Filtering](#filtering-options) and [Protocol Options](#protocol-options).
+Checksums based on the `DIRSHASH` must contain the additional configuration options to be properly validated (as was discussed in the [Introduction](#introduction)). For this purpose, the Dirhash Standard provides the `DIRSUM` object which contains the DIRHASH value as well as the necessary information for verification. It's structure is laid out in JSON below, with properties according [Hash Function Options](#hash-function-options), [Filtering Options](#filtering-options) and [Protocol Options](#protocol-options) and version (as stated in the top of this document) for which version of this standard the DIRHASH computation complies with.
 ```json
 {
    "dirhash": "...",
@@ -151,14 +158,15 @@ Checksums based on the `DIRSHASH` must contain the additional configuration opti
       "empty_dirs": false},
    "protocol_options": {
       "entry_properties": ["name", "data"],
-      "on_cyclic_link": "raise"}
+      "on_cyclic_link": "raise"},
+   "version": "0.1.0"
 }
 ```
-When saved to file, the recommended extension is `<name>.dirsum.json`.
+When saved to file, the recommended extension is `.dirsum.json`.
 
 
-## Extensions
-The Dirhash Standard can be extended by introducing additional Filtering Options or entry properties such as:
+## Extending the Dirhash Standard
+The Dirhash Standard can be extended by introducing additional Filtering Options and/or entry properties. A few possible examples below:
 - **Permission Properties**: These are hard to get platform independent (different on windows/unix). The best option is probably to let go of platform independence here. Possible properties could be `permission-[owner|group|user]` or `permission-me` for permissions of current 
 process, 
 - **Owning User/Group**
@@ -166,7 +174,8 @@ process,
 
 
 ## Contribute
-If you find a bug, inconsistency or weakness in the Dirhash Standard, or that the documentation or the Standard itself can be simplified without loss of generality, please file an issue!
+If you find a bug, inconsistency or weakness in the Dirhash Standard, or that the documentation or the Standard itself can be simplified without loss of generality, please file an issue at [https://github.com/andhus/dirhash](https://github.com/andhus/dirhash). 
+
 
 If you have a use case that is not covered, it can hopefully be supported by an extension of the Standard. Please file an issue or make a PR if you think that it can benefit others.
 
