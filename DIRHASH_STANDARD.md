@@ -141,7 +141,7 @@ The Dirhash Protocol is designed so that the same hash should not be obtained wi
 
 **Cyclic Symbolic Links**: Presence of cyclic links, with `on_cyclic_links` set to `raise`.
 
-**Directory Empty**: No (non-empty) directory entries to hash in the Dirhash root directory, given provided Filtering Options and `include_empty_dirs` set to `false`.  
+**Directory Empty**: No (non-empty) directory entries to hash in the Dirhash root directory, given provided Filtering Options and `empty_dirs` set to `false`.  
 
 
 
