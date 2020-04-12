@@ -34,6 +34,74 @@ def dirhash(
     chunk_size=2**20,
     jobs=1
 ):
+    """Computes the hash of a directory based on its structure and content.
+
+    # Arguments
+        directory: Union[str, pathlib.Path] - Path to the directory to hash.
+        algorithm: str - The name of the hashing algorithm to use. See
+            `dirhash.algorithms_available` for the available options.
+            It is also possible to provide a callable object that returns an instance
+            implementing the `hashlib._hashlib.HASH` interface.
+        filtering: Union[dirhash.Filter, Dict[str, str]] - An instance of
+            dirhash.Filter or a dictionary of keyword arguments for the same.
+            Determines what paths within the `directory` to include when computing
+            the hash value. Default `None`, which means that all files and
+            directories are included  *except for empty directories*.
+                The `dirhash.Filter` supports glob/wildcard (".gitignore style") path
+            matching by the `match` argument. Paths *relative to the root `directory`
+            (i.e. excluding the name of the root directory itself) are matched
+            against the provided patterns. For example, to include all files,
+            except for hidden ones use:
+
+                `filtering={'match': ['*', '!.*']}`
+
+            (or the equivalent `filtering=Filter(match=['*', '!.*'])`). For
+            inspection and verification, you can pass the `filtering` argument to
+            `dirhash.get_leafpaths` to get a list of all paths that would be included
+            when computing the hash value.
+                For further options and details, see `dirhash.Filter`.
+        protocol: Union[dirhash.Filter, Dict[str, str]] - An instance of
+            dirhash.Protocol or a dictionary of keyword arguments for the same.
+            Determines (mainly) what properties of files and directories to consider
+            when computing the hash value. Default `None`, which means that both the
+            name and content (actual data) of files and directories will be included.
+                To only hash the "file structure", as in the name of files and
+            directories and their location relative to the root `directory`, use:
+            `protocol={'entry_properties': ['name']}`. Contrary, to only hash the
+            data and ignoring the name of directories and files use
+            `protocol={'entry_properties': ['data']}`. NOTE that the tree structure
+            in which files are organized under the root `directory` still influences
+            the computed hash with this option. As longs as all files have the same
+            content and are organised the same way in relation to all other files in
+            the Directed Acyclic Graph representing the file tree, the hash will
+            remain the same (but the "name of nodes" does not matter). This option
+            can e.g. be used to verify that that data is unchanged after renaming
+            files (change extensions etc.).
+                For further options and details, see `dirhash.Protocol`.
+        chunk_size: int - The number of bytes to read in one go from files while
+            being hashed. A too small size will slow down the processing and a larger
+            size consumes more working memory. Default 2**20 byte = 1 MiB.
+        jobs: int - The number of processes to use when computing the hash.
+            Default `1`, which means that a single (the main) process is used. NOTE
+            that using multiprocessing can significantly speed-up execution, see
+            `https://github.com/andhus/dirhash/tree/master/benchmark` for further
+            details.
+
+    # Returns
+        The hash/checksum as a string the of hexadecimal digits (the result of
+        `hexdigest` method of the hashlib._hashlib.HASH object corresponding to the
+        provided `algorithm`).
+
+    # Raises
+        TypeError/ValueError: For incorrectly provided arguments.
+        SymlinkRecursionError: In case the `directory` contains symbolic links that
+            lead to (infinite) recursion and `protocol=None` (default) or
+            `protocol=Protocol(on_cyclic_links='raise')`.
+                To be able to hash  directories with cyclic links use
+            `protocol={on_cyclic_links='hash reference')`.
+
+    """
+
     filter_ = _get_instance('filtering', filtering, Filter)
     protocol = _get_instance('protocol', protocol, Protocol)
     hasher_factory = _get_hasher_factory(algorithm)
@@ -148,7 +216,60 @@ def get_included_paths(
 
 
 class Filter(RecursionFilter):
+    """
+    TODO
+        match ([str] | None): A list (or iterable) of match-patterns for files to
+            include when computing the hash. Default `None` which is equivalent to
+            `['*']`, i.e. everything is included. See "Path Selection and Filtering"
+            below for further details.
+        ignore ([str] | None): A list (or iterable) of match-patterns for files to
+            ignore when computing the hash. Default `None` (no ignore patterns). See
+            "Path Selection and Filtering" below for further details.
 
+        follow_links (bool): If true, follow symbolic links to other *directories*.
+            NOTE that symbolic links to other *files* are always included (as if the
+            link was the actual file). Default `False`.
+        include_empty (bool): Include empty directories when computing the hash. A
+            directory is considered empty if it does not contain any files *matching
+            provided matching criteria*. Default `False`, i.e. empty directories are
+            ignored (as with git version control).
+
+
+    # Path Selection and Filtering
+        Provided match-patterns determine what paths within the `directory` to
+        include when computing the hash value. These follow the ".gitignore
+        wildcard style" of path matching. Paths *relative to the root `directory`
+        (excluding the name of the directory itself) are matched against the
+        patterns.
+            The `match` argument represent what should be *included* - as opposed
+        to `ignore` patterns for which matches are *excluded*. Using `ignore` is
+        just short for adding the same patterns to the `match` argument with the
+        prefix "!", i.e. the calls bellow are equivalent:
+
+            `dirhash(..., match=['*', '!<pattern>'])`
+            `dirhash(..., match=['*', '!<pattern>'], ignore=[])`
+            `dirhash(..., match=['*'], ignore=['<pattern>'])`
+            `dirhash(..., ignore=['<pattern>'])`
+
+        If a file named ".dirhashignore" (available by the `dirhash.ignorefilename`
+        module attribute) exists *directly* under the provided `directory`, then each
+        line (not starting with "#") of this file is added to the ignore patterns.
+
+        The following kwargs can also be used (possibly together with `match` and/or
+        `ignore`):
+            `ignore_extensions` ([str]): list (iterable) of file extensions to
+                exclude. Short for adding `'*[.]<extension>'`to the `ignore` patterns
+                where the dot [.] is added if <extension> does not already start with
+                a dot.
+            `ignore_hidden` (bool): Short for adding `['.*', '.*/']` to the `ignore`
+                patterns, which will exclude hidden files and directories.
+
+        To validate which paths are included, call `dirhash.get_leafpaths` with
+        the same values for the arguments: `match`, `ignore` `follow_links`,
+        `include_empty`, `ignore_extensions` and `ignore_hidden` to get a list of all
+        paths that will be included when computing the hash by this function.
+
+    """
     def __init__(
         self,
         match=None,
@@ -171,7 +292,16 @@ def get_match_patterns(
     ignore_hidden=False,
 ):
     """Combines the different arguments for providing match/ignore-patterns into a
-    single list of match-patterns.
+
+    match ([str] | None): A list (or iterable) of match-patterns for files to
+        include when computing the hash. Default `None` which is equivalent to
+        `['*']`, i.e. everything is included. See "Path Selection and Filtering"
+        below for further details.
+    ignore ([str] | None): A list (or iterable) of match-patterns for files to
+        ignore when computing the hash. Default `None` (no ignore patterns). See
+        "Path Selection and Filtering" below for further details.
+
+
     """
     match = ['*'] if match is None else list(match)
     ignore = [] if ignore is None else list(ignore)
@@ -202,7 +332,24 @@ def get_match_patterns(
 
 
 class Protocol(object):
+    """
+        content_only (bool): Compute the hash only based on the content of files -
+            *not* their names or the names of their parent directories. Default
+            `False`.
+                NOTE that the tree structure in which files are organized under the
+            the `directory` root still influences the computed hash. As longs as all
+            files have the same content and are organised the same way in relation to
+            all other files in the Directed Acyclic Graph representing the file-tree,
+            the hash will remain the same (but the "name of nodes" does not matter).
+            This option can e.g. be used to verify that that data is unchanged after
+            renaming files (change extensions etc.).
+        paths_only (bool): Compute the hash only based on the name and location of
+            files in the file tree under the `directory` root. Default `False`.
+                This option can e.g. be used to check if any files have been
+            added/moved/removed, ignoring the content of each file. This is
+            considerably faster than including content.
 
+    """
     class OnCyclicLink(object):
         RAISE = 'raise'
         HASH_REFERENCE = 'hash_reference'
@@ -328,98 +475,6 @@ def _parmap(func, iterable, jobs=1):
         pool.close()
 
     return results
-
-
-_old_docs = """
-    Computes the hash of a directory based on its structure and content.
-    
-    # Arguments
-        directory (str | pathlib.Path): Path to the directory to hash.
-        algorithm (str): The name of the hashing algorithm to use. It is also
-            possible to provide a callable object that returns an instance
-            implementing the `hashlib._hashlib.HASH` interface.
-        match ([str] | None): A list (or iterable) of match-patterns for files to
-            include when computing the hash. Default `None` which is equivalent to
-            `['*']`, i.e. everything is included. See "Path Selection and Filtering"
-            below for further details.
-        ignore ([str] | None): A list (or iterable) of match-patterns for files to
-            ignore when computing the hash. Default `None` (no ignore patterns). See
-            "Path Selection and Filtering" below for further details.
-        chunk_size (int): The number of bytes to read in one go from files while
-            being hashed. A too small size will slow down the processing and a larger
-            size consumes more working memory. Default 2**20 byte = 1 MiB.
-        content_only (bool): Compute the hash only based on the content of files -
-            *not* their names or the names of their parent directories. Default
-            `False`.
-                NOTE that the tree structure in which files are organized under the
-            the `directory` root still influences the computed hash. As longs as all
-            files have the same content and are organised the same way in relation to
-            all other files in the Directed Acyclic Graph representing the file-tree,
-            the hash will remain the same (but the "name of nodes" does not matter).
-            This option can e.g. be used to verify that that data is unchanged after
-            renaming files (change extensions etc.).
-        paths_only (bool): Compute the hash only based on the name and location of
-            files in the file tree under the `directory` root. Default `False`.
-                This option can e.g. be used to check if any files have been
-            added/moved/removed, ignoring the content of each file. This is
-            considerably faster than including content.
-        follow_links (bool): If true, follow symbolic links to other *directories*.
-            NOTE that symbolic links to other *files* are always included (as if the
-            link was the actual file). Default `False`.
-        include_empty (bool): Include empty directories when computing the hash. A
-            directory is considered empty if it does not contain any files *matching
-            provided matching criteria*. Default `False`, i.e. empty directories are
-            ignored (as with git version control).
-        workers (int | None): The number of processes to use when computing the hash.
-            Default `None`, equivalent to `1`, which means no multiprocessing is
-            used. NOTE that using multiprocessing can significantly speed-up
-            execution, see `https://github.com/andhus/dirhash/tree/master/benchmark`
-            for further details.
-
-    # Returns
-        The hash/checksum as a string the of hexadecimal digits (the result of
-        `hexdigest` method of the hashlib._hashlib.HASH object corresponding to the
-        provided `algorithm`).
-
-    # Raises
-        ValueError: For incorrectly provided arguments.
-        SymlinkRecursionError: In case the `directory` contains symbolic links that
-            lead to (infinite) recursion.
-
-    # Path Selection and Filtering
-        Provided match-patterns determine what paths within the `directory` to
-        include when computing the hash value. These follow the ".gitignore
-        wildcard style" of path matching. Paths *relative to the root `directory`
-        (excluding the name of the directory itself) are matched against the
-        patterns.
-            The `match` argument represent what should be *included* - as opposed
-        to `ignore` patterns for which matches are *excluded*. Using `ignore` is
-        just short for adding the same patterns to the `match` argument with the
-        prefix "!", i.e. the calls bellow are equivalent:
-
-            `dirhash(..., match=['*', '!<pattern>'])`
-            `dirhash(..., match=['*', '!<pattern>'], ignore=[])`
-            `dirhash(..., match=['*'], ignore=['<pattern>'])`
-            `dirhash(..., ignore=['<pattern>'])`
-
-        If a file named ".dirhashignore" (available by the `dirhash.ignorefilename`
-        module attribute) exists *directly* under the provided `directory`, then each
-        line (not starting with "#") of this file is added to the ignore patterns.
-
-        The following kwargs can also be used (possibly together with `match` and/or
-        `ignore`):
-            `ignore_extensions` ([str]): list (iterable) of file extensions to
-                exclude. Short for adding `'*[.]<extension>'`to the `ignore` patterns
-                where the dot [.] is added if <extension> does not already start with
-                a dot.
-            `ignore_hidden` (bool): Short for adding `['.*', '.*/']` to the `ignore`
-                patterns, which will exclude hidden files and directories.
-
-        To validate which paths are included, call `dirhash.get_leafpaths` with
-        the same values for the arguments: `match`, `ignore` `follow_links`,
-        `include_empty`, `ignore_extensions` and `ignore_hidden` to get a list of all
-        paths that will be included when computing the hash by this function.
-    """
 
 
 def _get_instance(argname, instance_or_kwargs, cls):
