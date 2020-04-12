@@ -111,6 +111,42 @@ def dirhash(
     return dirhash_
 
 
+def get_included_paths(
+    directory,
+    filtering=None,
+    protocol=None
+):
+    """Inspect what paths are included for the corresponding arguments to the
+    `dirhash.dirhash` function.
+
+    # Arguments:
+        This function accepts the following subset of the function `dirhash.dirhash`
+        arguments: `directory`, `match`, `ignore` `follow_links`, `include_empty`,
+        `ignore_extensions` and `ignore_hidden`, with the same meaning. See docs of
+        `dirhash.dirhash` for further details.
+
+    # Returns
+        A sorted list of the paths ([str]) that would be included in computing the
+        hash of `directory` given the provided arguments.
+    """
+    protocol = _get_instance('protocol', protocol, Protocol)
+    filter_ = _get_instance('filtering', filtering, Filter)
+    allow_cyclic_links = protocol.on_cyclic_link != protocol.OnCyclicLink.RAISE
+
+    leafpaths = scantree(
+        directory,
+        recursion_filter=filter_,
+        follow_links=True,
+        allow_cyclic_links=allow_cyclic_links,
+        include_empty=filter_.empty_dirs
+    ).leafpaths()
+
+    return [
+        path.relative if path.is_file() else os.path.join(path.relative, '.')
+        for path in leafpaths
+    ]
+
+
 class Filter(RecursionFilter):
 
     def __init__(
@@ -126,6 +162,43 @@ class Filter(RecursionFilter):
             match=match_patterns
         )
         self.empty_dirs = empty_dirs
+
+
+def get_match_patterns(
+    match=None,
+    ignore=None,
+    ignore_extensions=None,
+    ignore_hidden=False,
+):
+    """Combines the different arguments for providing match/ignore-patterns into a
+    single list of match-patterns.
+    """
+    match = ['*'] if match is None else list(match)
+    ignore = [] if ignore is None else list(ignore)
+    ignore_extensions = [] if ignore_extensions is None else list(ignore_extensions)
+
+    if ignore_hidden:
+        ignore.extend(['.*', '.*/'])
+
+    for ext in ignore_extensions:
+        if not ext.startswith('.'):
+            ext = '.' + ext
+        ext = '*' + ext
+        ignore.append(ext)
+
+    match_spec = match + ['!' + ign for ign in ignore]
+
+    def deduplicate(items):
+        items_set = set([])
+        dd_items = []
+        for item in items:
+            if item not in items_set:
+                dd_items.append(item)
+                items_set.add(item)
+
+        return dd_items
+
+    return deduplicate(match_spec)
 
 
 class Protocol(object):
@@ -219,42 +292,6 @@ class Protocol(object):
         )
         # TODO normalize posix!
         return path_to_target
-
-
-def get_included_paths(
-    directory,
-    filtering=None,
-    protocol=None
-):
-    """Inspect what paths are included for the corresponding arguments to the
-    `dirhash.dirhash` function.
-
-    # Arguments:
-        This function accepts the following subset of the function `dirhash.dirhash`
-        arguments: `directory`, `match`, `ignore` `follow_links`, `include_empty`,
-        `ignore_extensions` and `ignore_hidden`, with the same meaning. See docs of
-        `dirhash.dirhash` for further details.
-
-    # Returns
-        A sorted list of the paths ([str]) that would be included in computing the
-        hash of `directory` given the provided arguments.
-    """
-    protocol = _get_instance('protocol', protocol, Protocol)
-    filter_ = _get_instance('filtering', filtering, Filter)
-    allow_cyclic_links = protocol.on_cyclic_link != protocol.OnCyclicLink.RAISE
-
-    leafpaths = scantree(
-        directory,
-        recursion_filter=filter_,
-        follow_links=True,
-        allow_cyclic_links=allow_cyclic_links,
-        include_empty=filter_.empty_dirs
-    ).leafpaths()
-
-    return [
-        path.relative if path.is_file() else os.path.join(path.relative, '.')
-        for path in leafpaths
-    ]
 
 
 def _get_hasher_factory(algorithm):
@@ -431,39 +468,3 @@ def _get_filehash(filepath, hasher_factory, chunk_size, cache=None):
 
     return hasher.hexdigest()
 
-
-def get_match_patterns(
-    match=None,
-    ignore=None,
-    ignore_extensions=None,
-    ignore_hidden=False,
-):
-    """Combines the different arguments for providing match/ignore-patterns into a
-    single list of match-patterns.
-    """
-    match = ['*'] if match is None else list(match)
-    ignore = [] if ignore is None else list(ignore)
-    ignore_extensions = [] if ignore_extensions is None else list(ignore_extensions)
-
-    if ignore_hidden:
-        ignore.extend(['.*', '.*/'])
-
-    for ext in ignore_extensions:
-        if not ext.startswith('.'):
-            ext = '.' + ext
-        ext = '*' + ext
-        ignore.append(ext)
-
-    match_spec = match + ['!' + ign for ign in ignore]
-
-    def deduplicate(items):
-        items_set = set([])
-        dd_items = []
-        for item in items:
-            if item not in items_set:
-                dd_items.append(item)
-                items_set.add(item)
-
-        return dd_items
-
-    return deduplicate(match_spec)
