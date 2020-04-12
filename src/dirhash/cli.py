@@ -168,7 +168,7 @@ def preprocess_kwargs(kwargs):
     match_patterns = dirhash.get_match_patterns(**match_kwargs)
 
     filtering_kwargs = {
-        'match_patterns': match_patterns,
+        'match': match_patterns,
         'linked_dirs': kwargs.pop('linked_dirs'),
         'linked_files': kwargs.pop('linked_files'),
         'empty_dirs': kwargs.pop('empty_dirs'),

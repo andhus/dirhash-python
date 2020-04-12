@@ -88,11 +88,11 @@ class TestCLI(object):
             # Filtering options
             (
                 '. -a md5 -m "* !.*"',
-                {'filtering': {'match_patterns': ['*', '!.*']}}
+                {'filtering': {'match': ['*', '!.*']}}
             ),
             (
                 '. -a md5 --match "d1/* d2/*" --ignore "*.txt"',
-                {'filtering': {'match_patterns': ['d1/*', 'd2/*', '!*.txt']}}
+                {'filtering': {'match': ['d1/*', 'd2/*', '!*.txt']}}
             ),
             (
                 '. -a md5 --empty-dirs',
@@ -125,7 +125,7 @@ class TestCLI(object):
     def test_get_kwargs(self, argstring, non_default_kwargs):
         from dirhash.cli import get_kwargs
         filter_kwargs = {
-            'match_patterns': ['*'],
+            'match': ['*'],
             'empty_dirs': False,
             'linked_dirs': True,
             'linked_files': True

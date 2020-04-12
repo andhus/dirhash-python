@@ -270,7 +270,7 @@ class TestGetIncludedPaths(TempDirTest):
         # with ignore
         filepaths = get_included_paths(
             self.path_to('root'),
-            filtering={'match_patterns': ['*', '!.*']}
+            filtering={'match': ['*', '!.*']}
         )
         assert filepaths == ['.d2/f1', 'd1/f1', 'f1']
 
@@ -291,7 +291,7 @@ class TestGetIncludedPaths(TempDirTest):
         # with ignore
         filepaths = get_included_paths(
             self.path_to('root'),
-            filtering={'match_patterns': ['*', '!.*/']}
+            filtering={'match': ['*', '!.*/']}
         )
         assert filepaths == ['.f2', 'd1/.f2', 'd1/f1', 'f1']
 
@@ -312,7 +312,7 @@ class TestGetIncludedPaths(TempDirTest):
         # using ignore
         filepaths = get_included_paths(
             self.path_to('root'),
-            filtering={'match_patterns': ['*', '!.*/', '!.*']}
+            filtering={'match': ['*', '!.*/', '!.*']}
         )
         assert filepaths == ['d1/f1', 'f1']
 
@@ -332,7 +332,7 @@ class TestGetIncludedPaths(TempDirTest):
 
         filepaths = get_included_paths(
             self.path_to('root'),
-            filtering={'match_patterns': ['*', '!*.skip1', '!*.skip2']}
+            filtering={'match': ['*', '!*.skip1', '!*.skip2']}
         )
         assert filepaths == [
             'd1/f.txt', 'f', 'f.skip1.txt', 'f.skip1skip2', 'f.txt', 'fskip1']
@@ -372,7 +372,7 @@ class TestGetIncludedPaths(TempDirTest):
         filepaths = get_included_paths(
             self.path_to('root'),
             filtering={
-                'match_patterns': ['*', '!.*'],
+                'match': ['*', '!.*'],
                 'empty_dirs': False
             }
         )
@@ -381,14 +381,14 @@ class TestGetIncludedPaths(TempDirTest):
         # `include_empty=False` is default
         filepaths = get_included_paths(
             self.path_to('root'),
-            filtering={'match_patterns': ['*', '!.*']},
+            filtering={'match': ['*', '!.*']},
         )
         assert filepaths == ['d1/f']
 
         filepaths = get_included_paths(
             self.path_to('root'),
             filtering={
-                'match_patterns': ['*', '!.*'],
+                'match': ['*', '!.*'],
                 'empty_dirs': True
             }
         )
@@ -403,7 +403,7 @@ class TestGetIncludedPaths(TempDirTest):
         filepaths = get_included_paths(
             self.path_to('root'),
             filtering={
-                'match_patterns': ['*', '!.*'],
+                'match': ['*', '!.*'],
                 'empty_dirs': True
             }
         )
@@ -412,7 +412,7 @@ class TestGetIncludedPaths(TempDirTest):
         filepaths = get_included_paths(
             self.path_to('root'),
             filtering={
-                'match_patterns': ['*', '!.*/'],
+                'match': ['*', '!.*/'],
                 'empty_dirs': True
             }
         )
@@ -421,7 +421,7 @@ class TestGetIncludedPaths(TempDirTest):
         filepaths = get_included_paths(
             self.path_to('root'),
             filtering={
-                'match_patterns': ['*', '!d1'],
+                'match': ['*', '!d1'],
                 'empty_dirs': True
             }
         )

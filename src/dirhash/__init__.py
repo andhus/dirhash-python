@@ -151,7 +151,7 @@ class Filter(RecursionFilter):
 
     def __init__(
         self,
-        match_patterns=None,
+        match=None,
         linked_dirs=True,
         linked_files=True,
         empty_dirs=False
@@ -159,7 +159,7 @@ class Filter(RecursionFilter):
         super(Filter, self).__init__(
             linked_dirs=linked_dirs,
             linked_files=linked_files,
-            match=match_patterns
+            match=match
         )
         self.empty_dirs = empty_dirs
 
