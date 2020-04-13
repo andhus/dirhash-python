@@ -236,7 +236,7 @@ class TestGetIncludedPaths(TempDirTest):
         with pytest.raises(SymlinkRecursionError) as exc_info:
             included_paths(
                 self.path_to('root'),
-                protocol={'on_cyclic_link': 'raise'}
+                protocol={'allow_cyclic_links': False}
             )
         assert exc_info.value.real_path == os.path.realpath(self.path_to('root'))
         assert exc_info.value.first_path == self.path_to('root/')
@@ -245,11 +245,11 @@ class TestGetIncludedPaths(TempDirTest):
 
         filepaths = included_paths(
             self.path_to('root'),
-            protocol={'on_cyclic_link': 'hash_reference'}
+            protocol={'allow_cyclic_links': True}
         )
         assert filepaths == ['d1/link_back/.']
 
-        # default is 'on_cyclic_link': 'raise'
+        # default is 'allow_cyclic_links': False
         with pytest.raises(SymlinkRecursionError):
             filepaths = included_paths(self.path_to('root'))
 
@@ -793,7 +793,7 @@ class TestDirhash(TempDirTest):
         dirhash(
             self.path_to('root'),
             'sha256',
-            protocol={'on_cyclic_link': 'hash_reference'}
+            protocol={'allow_cyclic_links': True}
         )
 
     def test_hash_cyclic_link(self):
@@ -802,7 +802,7 @@ class TestDirhash(TempDirTest):
         dirhash(
             self.path_to('root'),
             'sha256',
-            protocol={'on_cyclic_link': 'hash_reference'}
+            protocol={'allow_cyclic_links': True}
         )
 
     def test_pass_filtering_instance(self):
@@ -856,9 +856,9 @@ class TestProtocol(object):
         with pytest.raises(ValueError):
             Protocol(entry_properties=['not-valid'])
 
-    def test_raise_for_invalid_on_cyclic_link(self):
+    def test_raise_for_invalid_allow_cyclic_links(self):
         with pytest.raises(ValueError):
-            Protocol(on_cyclic_link='not-valid')
+            Protocol(allow_cyclic_links='not-valid')
 
 
 def mock_func(x):

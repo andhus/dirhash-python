@@ -174,11 +174,7 @@ def preprocess_kwargs(kwargs):
         'empty_dirs': kwargs.pop('empty_dirs'),
     }
     protocol_kwargs = {
-        'on_cyclic_link': (
-            dirhash.Protocol.OnCyclicLink.HASH_REFERENCE
-            if kwargs.pop('allow_cyclic_links')
-            else dirhash.Protocol.OnCyclicLink.RAISE
-        ),
+        'allow_cyclic_links': kwargs.pop('allow_cyclic_links'),
         'entry_properties': kwargs.pop('properties') or ["data", "name"]
     }
     kwargs['filtering'] = filtering_kwargs

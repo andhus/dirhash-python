@@ -107,9 +107,9 @@ def dirhash(
         TypeError/ValueError: For incorrectly provided arguments.
         SymlinkRecursionError: In case the `directory` contains symbolic links that
             lead to (infinite) recursion and `protocol=None` (default) or
-            `protocol={'on_cyclic_links': 'raise'}`.
+            `protocol={'allow_cyclic_links': False}`.
                 To be able to hash  directories with cyclic links use
-            `protocol={'on_cyclic_links': 'hash reference'}`.
+            `protocol={'allow_cyclic_links': True}`.
 
     # References
         See https://github.com/andhus/dirhash/DIRHASH_STANDARD.md for a formal
@@ -119,7 +119,6 @@ def dirhash(
     filter_ = _get_instance('filtering', filtering, Filter)
     protocol = _get_instance('protocol', protocol, Protocol)
     hasher_factory = _get_hasher_factory(algorithm)
-    allow_cyclic_links = protocol.on_cyclic_link != protocol.OnCyclicLink.RAISE
 
     def dir_apply(dir_node):
         if not filter_.empty_dirs:
@@ -149,7 +148,7 @@ def dirhash(
             file_apply=file_apply,
             dir_apply=dir_apply,
             follow_links=True,
-            allow_cyclic_links=allow_cyclic_links,
+            allow_cyclic_links=protocol.allow_cyclic_links,
             cache_file_apply=False,
             include_empty=filter_.empty_dirs,
             jobs=1
@@ -166,7 +165,7 @@ def dirhash(
             recursion_filter=filter_,
             file_apply=extract_real_paths,
             follow_links=True,
-            allow_cyclic_links=allow_cyclic_links,
+            allow_cyclic_links=protocol.allow_cyclic_links,
             cache_file_apply=False,
             include_empty=filter_.empty_dirs,
             jobs=1
@@ -212,13 +211,12 @@ def included_paths(
     """
     protocol = _get_instance('protocol', protocol, Protocol)
     filter_ = _get_instance('filtering', filtering, Filter)
-    allow_cyclic_links = protocol.on_cyclic_link != protocol.OnCyclicLink.RAISE
 
     leafpaths = scantree(
         directory,
         recursion_filter=filter_,
         follow_links=True,
-        allow_cyclic_links=allow_cyclic_links,
+        allow_cyclic_links=protocol.allow_cyclic_links,
         include_empty=filter_.empty_dirs
     ).leafpaths()
 
@@ -338,16 +336,11 @@ class Protocol(object):
                 files in the file tree under the `directory` root. This option can
                 e.g. be used to check if any files have been added/moved/removed,
                 ignoring the content of each file.
-        on_cyclic_link: str - One of:
-            - "raise" - A `SymlinkRecursionError` is raised on presence of cyclic
-                symbolic links.
-            - "hash_reference"
+        allow_cyclic_links: bool - If `False` (default) a `SymlinkRecursionError` is
+            raised on presence of cyclic symbolic links. If set to `True` the the
+            dirhash value for directory causing the cyclic link is replaced with the
+            hash function hexdigest of the relative path from the link to the target.
     """
-    class OnCyclicLink(object):
-        RAISE = 'raise'
-        HASH_REFERENCE = 'hash_reference'
-        options = {RAISE, HASH_REFERENCE}
-
     class EntryProperties(object):
         NAME = 'name'
         DATA = 'data'
@@ -361,7 +354,7 @@ class Protocol(object):
     def __init__(
         self,
         entry_properties=('name', 'data'),
-        on_cyclic_link='raise'
+        allow_cyclic_links=False
     ):
         entry_properties = set(entry_properties)
         if not entry_properties.issubset(self.EntryProperties.options):
@@ -381,11 +374,12 @@ class Protocol(object):
         self._include_data = self.EntryProperties.DATA in entry_properties
         self._include_is_link = self.EntryProperties.IS_LINK in entry_properties
 
-        if on_cyclic_link not in self.OnCyclicLink.options:
+        if not isinstance(allow_cyclic_links, bool):
             raise ValueError(
-                '{}: not a valid on_cyclic_link option'.format(on_cyclic_link)
+                'allow_cyclic_link must be a boolean, '
+                'got {}'.format(allow_cyclic_links)
             )
-        self.on_cyclic_link = on_cyclic_link
+        self.allow_cyclic_links = allow_cyclic_links
 
     def get_descriptor(self, dir_node):
         if isinstance(dir_node, CyclicLinkedDir):

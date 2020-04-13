@@ -113,12 +113,12 @@ is_link | Whether the entry is a symlink, one of `"true"` or `"false"`. | Option
 
 
 ### Cyclic Links
-Symbolically linked directories can create cycles in the, otherwise acyclic, graph representing the file tree. If not handled properly, this leads to infinite recursion when traversing the file tree (this is e.g. the case for Python's built-in [`os.walk(directory, followlinks=True)`](https://stackoverflow.com/questions/36977259/avoiding-infinite-recursion-with-os-walk/36977580)). Moreover, this breaks the recursive definition of the Dirhash Protocol, which offers two alternative solutions for the special case, specified by the option `on_cyclic_link`.
+Symbolically linked directories can create cycles in the, otherwise acyclic, graph representing the file tree. If not handled properly, this leads to infinite recursion when traversing the file tree (this is e.g. the case for Python's built-in [`os.walk(directory, followlinks=True)`](https://stackoverflow.com/questions/36977259/avoiding-infinite-recursion-with-os-walk/36977580)). Moreover, this breaks the recursive definition of the Dirhash Protocol, which offers two alternative solutions for the special case, specified by the option `allow_cyclic_links`.
 
-#### `on_cyclic_link`: `"raise"`
+#### `allow_cyclic_links: false`
 The the first option is to consider cyclic links an [error condition](#error-conditions) and raise an appropriate exception when detected (preferably before reaching the recursion limit of the language of implementation!).
 
-#### `on_cyclic_link`: `"hash reference"`
+#### `allow_cyclic_links: true`
 The other option is to replace the dirhash value for the cyclic link with the hash function hexdigest of the relative path from the link to the target. The path is normalized according to the unix standard (with a forward slash `/` separating directories) and without a leading or trailing slash. 
 
 Sometimes multiple links form cycles together. Without loss of generality, cyclic links are defined as the *first occurrence of a link to a directory that has already been visited on the current branch of recursion*. The real path (or inode and device ID) of visited directories, together with the path relative to the Dirhash root, must typically be cached during traversal of the file tree to identify and resolve cyclic links. For further details, see these [examples](#cyclic-links-examples).
@@ -128,7 +128,7 @@ Sometimes multiple links form cycles together. Without loss of generality, cycli
 Name  | Type             | Default             | Description 
 ----  | ---------------- | ------------------- | -----------
 entry_properties | Array of Strings | `["name", "data"]` | Which Directory Entry properties to consider. NOTE that `type` is a mandatory property and should not be provided
-on_cyclic_link | String, One of `"raise"` and `"hash reference"` | `"raise"` | how to handle [cyclic links](#cyclic-links).
+allow_cyclic_links | Boolean | `false` | Whether or not to allow the presence of [cyclic links](#cyclic-links).
 
 The Dirhash Protocol is designed so that the same hash should not be obtained with different Protocol Options. Subsequently, when the same hash is obtained one can be sure that the same Protocol Options were used. The options must still be provided when comparing checksums, but this removes the risk of false positives (confirmation of the checksum) due to wrong options used.
 
@@ -139,7 +139,7 @@ The Dirhash Protocol is designed so that the same hash should not be obtained wi
 
 **File Not Accessible**: A not accessible file results in an error if the entry property `data` is used unless excluded by the `match_patterns` filtering option.
 
-**Cyclic Symbolic Links**: Presence of cyclic links, with `on_cyclic_links` set to `raise`.
+**Cyclic Symbolic Links**: Presence of cyclic links, with `allow_cyclic_links` set to `false`.
 
 **Directory Empty**: No (non-empty) directory entries to hash in the Dirhash root directory, given provided Filtering Options and `empty_dirs` set to `false`.  
 
@@ -158,7 +158,7 @@ Checksums based on the `DIRSHASH` must contain the additional configuration opti
       "empty_dirs": false},
    "protocol_options": {
       "entry_properties": ["name", "data"],
-      "on_cyclic_link": "raise"},
+      "allow_cyclic_links": false},
    "version": "0.1.0"
 }
 ```

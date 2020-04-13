@@ -109,7 +109,7 @@ class TestCLI(object):
             # Protocol options
             (
                 '. -a md5 --allow-cyclic-links',
-                {'protocol': {'on_cyclic_link': 'hash_reference'}}
+                {'protocol': {'allow_cyclic_links': True}}
             ),
             # Implementation
             (
@@ -132,7 +132,7 @@ class TestCLI(object):
         }
         protocol_kwargs = {
             'entry_properties': ['data', 'name'],
-            'on_cyclic_link': 'raise'
+            'allow_cyclic_links': False
         }
         filter_kwargs.update(non_default_kwargs.pop('filtering', {}))
         protocol_kwargs.update(non_default_kwargs.pop('protocol', {}))
