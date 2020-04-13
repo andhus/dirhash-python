@@ -16,7 +16,7 @@ def main():
             # kwargs below have no effect when listing
             for k in ['algorithm', 'chunk_size', 'jobs']:
                 kwargs.pop(k)
-            for leafpath in dirhash.get_included_paths(**kwargs):
+            for leafpath in dirhash.included_paths(**kwargs):
                 print(leafpath)
         else:
             print(dirhash.dirhash(**kwargs))
