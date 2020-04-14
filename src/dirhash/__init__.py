@@ -321,7 +321,9 @@ class Protocol(object):
         computing the `dirhash` value.
 
     # Arguments
-        entry_properties: List[str] - Must be one of the following combinations:
+        entry_properties: List[str] - A combination of the supported properties
+            {"name", "data", "is_link"} where at least one of "name" and "data" is
+            included. Interpretation:
             - ["name", "data"] (Default) - The name as well as data is included.
             - ["data"] - Compute the hash only based on the data of files -
                 *not* their names or the names of their parent directories. NOTE that
@@ -336,6 +338,11 @@ class Protocol(object):
                 files in the file tree under the `directory` root. This option can
                 e.g. be used to check if any files have been added/moved/removed,
                 ignoring the content of each file.
+            - "is_link" - if this options is added to any of the cases above the
+                hash value is also affected by whether a file or directory is a
+                symbolic link or not. NOTE: which this property added, the hash
+                will be different than without it even if there are no symbolic links
+                in the directory.
         allow_cyclic_links: bool - If `False` (default) a `SymlinkRecursionError` is
             raised on presence of cyclic symbolic links. If set to `True` the the
             dirhash value for directory causing the cyclic link is replaced with the
@@ -452,6 +459,7 @@ def _get_hasher_factory(algorithm):
 
 
 def _parmap(func, iterable, jobs=1):
+    """Map with multiprocessing.Pool"""
     if jobs == 1:
         return [func(element) for element in iterable]
 
@@ -478,11 +486,11 @@ def _get_instance(argname, instance_or_kwargs, cls):
 
 
 def _get_filehash(filepath, hasher_factory, chunk_size, cache=None):
-    """Compute the hash for given filepath.
+    """Compute the hash of the given filepath.
 
     # Arguments
-        filepath (str): Path to the file to hash.
-        hasher_factory (f: f() -> hashlib._hashlib.HASH): Callable that returns an
+        filepath: str - Path to the file to hash.
+        hasher_factory: (f: f() -> hashlib._hashlib.HASH): Callable that returns an
             instance of the `hashlib._hashlib.HASH` interface.
         chunk_size (int): The number of bytes to read in one go from files while
             being hashed.
@@ -509,4 +517,3 @@ def _get_filehash(filepath, hasher_factory, chunk_size, cache=None):
             hasher.update(chunk)
 
     return hasher.hexdigest()
-

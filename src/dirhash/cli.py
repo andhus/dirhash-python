@@ -180,19 +180,6 @@ def preprocess_kwargs(kwargs):
     kwargs['filtering'] = filtering_kwargs
     kwargs['protocol'] = protocol_kwargs
 
-    # TODO remove!?
-    # remote_ignorefile = os.environ.get('DIRHASH_IGNORE', None)
-    # root_ignorefile_path = os.path.join(kwargs['directory'], dirhash.ignorefilename)
-    # if os.path.exists(root_ignorefile_path):
-    #     kwargs['ignore'] = (
-    #         dirhash._parse_ignorefile(kwargs['directory']) + list(kwargs['ignore']))
-    # elif remote_ignorefile:
-    #     if not os.path.exists(remote_ignorefile):
-    #         raise ValueError(
-    #             'DIRHASH_IGNORE={}: No such file'.format(remote_ignorefile)
-    #         )
-    #     with open(remote_ignorefile) as f:
-    #         kwargs['ignore'] = f.readlines() + kwargs['ignore']
     return kwargs
 
 
