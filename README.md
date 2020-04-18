@@ -25,16 +25,16 @@ Python module:
 ```python
 from dirhash import dirhash
 
-dirpath = 'path/to/directory'
-dir_md5          = dirhash(dirpath, 'md5')
-filtered_sha1    = dirhash(dirpath, 'sha1', ignore=['.*', '.*/', '*.pyc'])
-pyfiles_sha3_512 = dirhash(dirpath, 'sha3_512', match=['*.py'])
+dirpath = "path/to/directory"
+dir_md5 = dirhash(dirpath, "md5")
+pyfiles_md5 = dirhash(dirpath, "md5", filtering={"match": ["*.py"]})
+no_hidden_sha1 = dirhash(dirpath, "sha1", filtering={"match": ["!.*", "!.*/"]})
 ```
 CLI:
 ```commandline
 dirhash path/to/directory -a md5
-dirhash path/to/directory -a sha1 -i ".*  .*/  *.pyc"
-dirhash path/to/directory -a sha3_512 -m "*.py"
+dirhash path/to/directory -a md5 --match "*.py"
+dirhash path/to/directory -a sha1 --ignore ".*"  ".*/"
 ```
 
 ## Why?

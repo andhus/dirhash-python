@@ -26,7 +26,9 @@ def main():
 
 
 def get_kwargs(args):
-    parser = argparse.ArgumentParser(description='Determine the hash for directory.')
+    parser = argparse.ArgumentParser(
+        description='Determine the hash for a directory.'
+    )
     parser.add_argument(
         '-v', '--version',
         action='version',
@@ -54,31 +56,42 @@ def get_kwargs(args):
 
     filter_options = parser.add_argument_group(
         title='Filtering options',
-        description='TODO: what files and directories to include...'
+        description=(
+            'Specify what files and directories to include. All files and '
+            'directories (including symbolic links) are included by default. The '
+            '--match/--ignore arguments allows for selection using glob/wildcard '
+            '(".gitignore style") path matching. Paths relative to the root '
+            '`directory` (i.e. excluding the name of the root directory itself) are '
+            'matched against the provided patterns. For example, to only include '
+            'python source files, use: `dirhash path/to/dir -m "*.py"` or to '
+            'exclude hidden files and directories use: '
+            '`dirhash path/to.dir -i ".*" ".*/"` which is short for '
+            '`dirhash path/to.dir -m "*" "!.*" "!.*/"`. By adding the --list '
+            'argument, all included paths, for the given filtering arguments, are '
+            'returned instead of the hash value. For further details see '
+            'https://github.com/andhus/dirhash/DIRHASH_STANDARD.md#filtering'
+        )
     )
     filter_options.add_argument(
         '-m', '--match',
-        type=str,
-        default='*',
-        help='String of match-patterns, separated by blank space.'
+        nargs='+',
+        default='"*"',
+        help=(
+            'String of match-patterns, separated by blank space. NOTE: patterns '
+            'with an asterisk must be in quotes ("*") or the asterisk '
+            'preceded by an escape character (\*).'
+        ),
+        metavar=''
     )
     filter_options.add_argument(
         '-i', '--ignore',
-        type=str,
-        default=None,
-        help='String of ignore-patterns, separated by blank space.',
-    )
-    filter_options.add_argument(
-        '-d', '--ignore-hidden',
-        action='store_true',
-        default=False,
-        help='Ignore hidden ("dot") files and directories (short for '
-             '`-ignore ".*, "`).'
-    )
-    filter_options.add_argument(
-        '-x', '--ignore-extensions',
         nargs='+',
-        help='List of file extensions to ignore.',
+        default=None,
+        help=(
+            'String of ignore-patterns, separated by blank space. NOTE: patterns '
+            'with an asterisk must be in quotes ("*") or the asterisk '
+            'preceded by an escape character (\*).'
+        ),
         metavar=''
     )
     filter_options.add_argument(
@@ -104,38 +117,47 @@ def get_kwargs(args):
 
     protocol_options = parser.add_argument_group(
         title='Protocol options',
-        description='TODO: what properties to hash...'
+        description=(
+            'Specify what properties of files and directories to include and '
+            'whether to allow cyclic links. For further details see '
+            'https://github.com/andhus/dirhash/DIRHASH_STANDARD.md#protocol'
+        )
     )
     protocol_options.add_argument(
         '-p', '--properties',
         nargs='+',
-        help='List of properties of files and directories to include in the hash. '
-             'Available properties are: {} and at least one of "name" and "data" '
-             'must be included'.format(dirhash.Protocol.EntryProperties.options),
+        help=(
+            'List of file/directory properties to include in the hash. Available '
+            'properties are: {} and at least one of name and data must be '
+            'included. Default is [name data] which means that both the name/paths'
+            ' and content (actual data) of files and directories will be included'
+        ).format(list(dirhash.Protocol.EntryProperties.options)),
         metavar=''
     )
     protocol_options.add_argument(
         '-c', '--allow-cyclic-links',
         default=False,
         action='store_true',
-        help='Allow presence of cyclic links.'
+        help=(
+            'Allow presence of cyclic links (by hashing the relative path to the '
+            'target directory).'
+        )
     )
-
 
     implementation_options = parser.add_argument_group(
         title='Implementation options',
-        description='TODO'
+        description=''
     )
     implementation_options.add_argument(
         '-s', '--chunk-size',
         default=2**20,
         type=int,
-        help='The chunk size (in bytes) for reading fo files.'
+        help='The chunk size (in bytes) for reading of files.'
     )
     implementation_options.add_argument(
         '-j', '--jobs',
         type=int,
-        default=1,  # TODO make default number of cores!
+        default=1,  # TODO make default number of cores?
         help='Number of jobs (parallel processes) to use.'
     )
 
@@ -152,18 +174,8 @@ def get_kwargs(args):
 
 
 def preprocess_kwargs(kwargs):
-    kwargs['match'] = parse_string_arg(kwargs['match'])
-    kwargs['ignore'] = parse_string_arg(kwargs['ignore'])
-    # for consistency with `match` and `ignore`, we allow ignore_extensions to be a
-    # space separate string (not the recommended usages).
-    x = 'ignore_extensions'
-    if kwargs[x] is not None:
-        if len(kwargs[x]) == 1:
-            kwargs[x] = parse_string_arg(kwargs[x][0])
-    else:
-        kwargs[x] = []
     match_kwargs = {}
-    for kwarg in ['match', 'ignore', 'ignore_extensions', 'ignore_hidden']:
+    for kwarg in ['match', 'ignore']:
         match_kwargs[kwarg] = kwargs.pop(kwarg)
     match_patterns = dirhash.get_match_patterns(**match_kwargs)
 
@@ -181,12 +193,6 @@ def preprocess_kwargs(kwargs):
     kwargs['protocol'] = protocol_kwargs
 
     return kwargs
-
-
-def parse_string_arg(string_arg):
-    if string_arg is None or string_arg == '':
-        return []
-    return string_arg.split(' ')
 
 
 if __name__ == '__main__':  # pragma: no cover

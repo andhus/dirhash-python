@@ -87,11 +87,11 @@ class TestCLI(object):
             ),
             # Filtering options
             (
-                '. -a md5 -m "* !.*"',
+                '. -a md5 -m "*" "!.*"',
                 {'filtering': {'match': ['*', '!.*']}}
             ),
             (
-                '. -a md5 --match "d1/* d2/*" --ignore "*.txt"',
+                '. -a md5 --match "d1/*" "d2/*" --ignore "*.txt"',
                 {'filtering': {'match': ['d1/*', 'd2/*', '!*.txt']}}
             ),
             (
@@ -110,6 +110,17 @@ class TestCLI(object):
             (
                 '. -a md5 --allow-cyclic-links',
                 {'protocol': {'allow_cyclic_links': True}}
+
+            ),
+            (
+                '. -a md5 --properties name',
+                {'protocol': {'entry_properties': ['name']}}
+
+            ),
+            (
+                '. -a md5 --properties name data',
+                {'protocol': {'entry_properties': ['name', 'data']}}
+
             ),
             # Implementation
             (
@@ -166,31 +177,24 @@ class TestCLI(object):
               'file.ext1\n'
               'file.ext2\n')),
             ('IGNORE EXTENSION',
-             ['. -x .ext1 --list',
-              '. --ignore-extensions .ext1 --list',
-              '. -i "*.ext1" --list',
+             ['. -i "*.ext1" --list',
               '. --ignore "*.ext1" --list',
-              '. -m "* !*.ext1" --list',
-              '. --match "* !*.ext1" --list'],
+              '. -m "*" "!*.ext1" --list',
+              '. --match "*" "!*.ext1" --list'],
              ('.dir/file\n'
               '.file\n'
               'dir/file\n'
               'file\n'
               'file.ext2\n')),
             ('IGNORE MULTIPLE EXTENSIONS',
-             ['. -x .ext1 .ext2 --list',
-              '. -x ".ext1 .ext2" --list',
-              '. --ignore-extensions .ext1 .ext2 --list',
-              '. -i "*.ext1 *.ext2" --list',
+             ['. -i "*.ext1" "*.ext2" --list',
               '. -i "*.ext*" --list'],
              ('.dir/file\n'
               '.file\n'
               'dir/file\n'
               'file\n')),
             ('IGNORE HIDDEN',
-             ['. -d --list',
-              '. --ignore-hidden --list',
-              '. -i ".* .*/" --list'],
+             ['. -i ".*" ".*/" --list'],
              ('dir/file\n'
               'file\n'
               'file.ext1\n'
