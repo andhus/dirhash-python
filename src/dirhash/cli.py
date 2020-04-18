@@ -75,7 +75,7 @@ def get_kwargs(args):
     filter_options.add_argument(
         '-m', '--match',
         nargs='+',
-        default='"*"',
+        default='*',
         help=(
             'String of match-patterns, separated by blank space. NOTE: patterns '
             'with an asterisk must be in quotes ("*") or the asterisk '
