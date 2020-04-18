@@ -151,12 +151,12 @@ Checksums based on the `DIRSHASH` must contain the additional configuration opti
 {
    "dirhash": "...",
    "algorithm": "...",
-   "filtering_options": {
+   "filtering": {
       "match_patterns": ["*"],
       "linked_dirs": true,
       "linked_files": true,
       "empty_dirs": false},
-   "protocol_options": {
+   "protocol": {
       "entry_properties": ["name", "data"],
       "allow_cyclic_links": false},
    "version": "0.1.0"
