@@ -69,7 +69,7 @@ def get_kwargs(args):
             '`dirhash path/to.dir -m "*" "!.*" "!.*/"`. By adding the --list '
             'argument, all included paths, for the given filtering arguments, are '
             'returned instead of the hash value. For further details see '
-            'https://github.com/andhus/dirhash/DIRHASH_STANDARD.md#filtering'
+            'https://github.com/andhus/dirhash/README.md#filtering'
         )
     )
     filter_options.add_argument(

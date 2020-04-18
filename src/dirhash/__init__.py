@@ -112,7 +112,7 @@ def dirhash(
             `protocol={'allow_cyclic_links': True}`.
 
     # References
-        See https://github.com/andhus/dirhash/DIRHASH_STANDARD.md for a formal
+        See https://github.com/andhus/dirhash/README.md for a formal
         description of how the returned hash value is computed.
     """
 

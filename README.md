@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.com/andhus/dirhash.svg?branch=master)](https://travis-ci.com/andhus/dirhash)
-[![codecov](https://codecov.io/gh/andhus/dirhash/branch/master/graph/badge.svg)](https://codecov.io/gh/andhus/dirhash)
+[![Build Status](https://travis-ci.com/andhus/dirhash-python.svg?branch=master)](https://travis-ci.com/andhus/dirhash-python)
+[![codecov](https://codecov.io/gh/andhus/dirhash-python/branch/master/graph/badge.svg)](https://codecov.io/gh/andhus/dirhash-python)
 
 # dirhash
 A lightweight python module and tool for computing the hash of any
@@ -9,7 +9,7 @@ directory based on its files' structure and content.
 include/exclude.
 - Multiprocessing for up to [6x speed-up](#performance)
 
-The hash is computed according to the [Dirhash Standard](https://github.com/andhus/dirhash/DIRHASH_STANDARD.md), which is designed to allow for consistent and collision resistant generation/verification of directory hashes across implementations.
+The hash is computed according to the [Dirhash Standard](https://github.com/andhus/dirhash), which is designed to allow for consistent and collision resistant generation/verification of directory hashes across implementations.
 
 ## Installation
 From PyPI:
@@ -18,7 +18,7 @@ pip install dirhash
 ```
 Or directly from source:
 ```commandline
-git clone git@github.com:andhus/dirhash.git
+git clone git@github.com:andhus/dirhash-standard.git
 pip install dirhash/
 ```
 
@@ -68,7 +68,7 @@ and executing `hashlib` code.
 The main effort to boost performance is support for multiprocessing, where the
 reading and hashing is parallelized over individual files.
 
-As a reference, let's compare the performance of the `dirhash` [CLI](https://github.com/andhus/dirhash/blob/master/dirhash/cli.py) 
+As a reference, let's compare the performance of the `dirhash` [CLI](https://github.com/andhus/dirhash/dirhash-python/cli.py) 
 with the shell command:
 
 `find path/to/folder -type f -print0 | sort -z | xargs -0 md5 | md5` 
@@ -89,7 +89,7 @@ shell reference     | nested_32k_32kB | 6.82     | -> 1.0
 `dirhash`           | nested_32k_32kB | 3.43     | 2.00
 `dirhash`(8 workers)| nested_32k_32kB | 1.14     | **6.00**
 
-The benchmark was run a MacBook Pro (2018), further details and source code [here](https://github.com/andhus/dirhash/tree/master/benchmark).
+The benchmark was run a MacBook Pro (2018), further details and source code [here](https://github.com/andhus/dirhash-python/benchmark).
 
 ## Documentation
-Please refer to `dirhash -h`, the python [source code](https://github.com/andhus/dirhash/blob/master/dirhash/__init__.py) and the [Dirhash Standard](https://github.com/andhus/dirhash/DIRHASH_STANDARD.md).
+Please refer to `dirhash -h`, the python [source code](https://github.com/andhus/dirhash/dirhash-python/__init__.py) and the [Dirhash Standard](https://github.com/andhus/dirhash).
