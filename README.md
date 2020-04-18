@@ -9,6 +9,8 @@ directory based on its files' structure and content.
 include/exclude.
 - Multiprocessing for up to [6x speed-up](#performance)
 
+The hash is computed according to the [Dirhash Standard](https://github.com/andhus/dirhash/DIRHASH_STANDARD.md), which is designed to allow for consistent and collision resistant generation/verification of directory hashes across implementations.
+
 ## Installation
 From PyPI:
 ```commandline
@@ -90,4 +92,4 @@ shell reference     | nested_32k_32kB | 6.82     | -> 1.0
 The benchmark was run a MacBook Pro (2018), further details and source code [here](https://github.com/andhus/dirhash/tree/master/benchmark).
 
 ## Documentation
-Please refer to `dirhash -h` and the python [source code](https://github.com/andhus/dirhash/blob/master/dirhash/__init__.py).
+Please refer to `dirhash -h`, the python [source code](https://github.com/andhus/dirhash/blob/master/dirhash/__init__.py) and the [Dirhash Standard](https://github.com/andhus/dirhash/DIRHASH_STANDARD.md).
