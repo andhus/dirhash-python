@@ -21,5 +21,8 @@ Complies with [Dirhash Standard](https://github.com/andhus/dirhash) Version [0.1
 underlying method/protocol for computing the hash. This means that **hashes 
 computed with this version will differ from hashes computed with version < 0.2.0 for 
 same directory**.
-- The dirhash python implementation has moved to here 
-[github.com/andhus/dirhash](https://github.com/andhus/dirhash) from the previous re
+- This dirhash python implementation has moved to here 
+[github.com/andhus/dirhash-python](https://github.com/andhus/dirhash-python) from 
+the previous repository 
+[github.com/andhus/dirhash](https://github.com/andhus/dirhash) 
+which now contains the formal description of the Dirhash Standard.
