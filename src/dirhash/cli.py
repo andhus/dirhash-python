@@ -14,7 +14,7 @@ def main():
         kwargs = get_kwargs(sys.argv[1:])
         if kwargs.pop('list'):
             # kwargs below have no effect when listing
-            for k in ['algorithm', 'chunk_size', 'jobs']:
+            for k in ['algorithm', 'chunk_size', 'jobs', 'entry_properties']:
                 kwargs.pop(k)
             for leafpath in dirhash.included_paths(**kwargs):
                 print(leafpath)
@@ -75,7 +75,7 @@ def get_kwargs(args):
     filter_options.add_argument(
         '-m', '--match',
         nargs='+',
-        default='*',
+        default=['*'],
         help=(
             'String of match-patterns, separated by blank space. NOTE: patterns '
             'with an asterisk must be in quotes ("*") or the asterisk '
@@ -126,10 +126,12 @@ def get_kwargs(args):
     protocol_options.add_argument(
         '-p', '--properties',
         nargs='+',
+        dest='entry_properties',
+        default=['data', 'name'],
         help=(
             'List of file/directory properties to include in the hash. Available '
             'properties are: {} and at least one of name and data must be '
-            'included. Default is [name data] which means that both the name/paths'
+            'included. Default is [data name] which means that both the name/paths'
             ' and content (actual data) of files and directories will be included'
         ).format(list(dirhash.Protocol.EntryProperties.options)),
         metavar=''
@@ -170,29 +172,29 @@ def get_kwargs(args):
              'provided filtering options.'
     )
 
-    return preprocess_kwargs(vars(parser.parse_args(args)))
+    return vars(parser.parse_args(args))
 
 
-def preprocess_kwargs(kwargs):
-    match_kwargs = {}
-    for kwarg in ['match', 'ignore']:
-        match_kwargs[kwarg] = kwargs.pop(kwarg)
-    match_patterns = dirhash.get_match_patterns(**match_kwargs)
-
-    filtering_kwargs = {
-        'match': match_patterns,
-        'linked_dirs': kwargs.pop('linked_dirs'),
-        'linked_files': kwargs.pop('linked_files'),
-        'empty_dirs': kwargs.pop('empty_dirs'),
-    }
-    protocol_kwargs = {
-        'allow_cyclic_links': kwargs.pop('allow_cyclic_links'),
-        'entry_properties': kwargs.pop('properties') or ["data", "name"]
-    }
-    kwargs['filtering'] = filtering_kwargs
-    kwargs['protocol'] = protocol_kwargs
-
-    return kwargs
+# def preprocess_kwargs(kwargs):
+#     match_kwargs = {}
+#     for kwarg in ['match', 'ignore']:
+#         match_kwargs[kwarg] = kwargs.pop(kwarg)
+#     match_patterns = dirhash.get_match_patterns(**match_kwargs)
+#
+#     filtering_kwargs = {
+#         'match': match_patterns,
+#         'linked_dirs': kwargs.pop('linked_dirs'),
+#         'linked_files': kwargs.pop('linked_files'),
+#         'empty_dirs': kwargs.pop('empty_dirs'),
+#     }
+#     protocol_kwargs = {
+#         'allow_cyclic_links': kwargs.pop('allow_cyclic_links'),
+#         'entry_properties': kwargs.pop('properties') or ["data", "name"]
+#     }
+#     kwargs['filtering'] = filtering_kwargs
+#     kwargs['protocol'] = protocol_kwargs
+#
+#     return kwargs
 
 
 if __name__ == '__main__':  # pragma: no cover

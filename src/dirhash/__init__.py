@@ -28,6 +28,7 @@ __all__ = [
     'algorithms_guaranteed',
     'algorithms_available',
     'dirhash',
+    'dirhash_impl',
     'included_paths',
     'Filter',
     'get_match_patterns',
@@ -43,7 +44,40 @@ algorithms_available = hashlib.algorithms_available
 def dirhash(
     directory,
     algorithm,
-    filtering=None,
+    match=("*",),
+    ignore=None,
+    linked_dirs=True,
+    linked_files=True,
+    empty_dirs=False,
+    entry_properties=('name', 'data'),
+    allow_cyclic_links=False,
+    chunk_size=2**20,
+    jobs=1
+):
+    filter_ = Filter(
+        match=get_match_patterns(match=match, ignore=ignore),
+        linked_dirs=linked_dirs,
+        linked_files=linked_files,
+        empty_dirs=empty_dirs
+    )
+    protocol = Protocol(
+        entry_properties=entry_properties,
+        allow_cyclic_links=allow_cyclic_links
+    )
+    return dirhash_impl(
+        directory=directory,
+        algorithm=algorithm,
+        filter_=filter_,
+        protocol=protocol,
+        chunk_size=chunk_size,
+        jobs=jobs
+    )
+
+
+def dirhash_impl(
+    directory,
+    algorithm,
+    filter_=None,
     protocol=None,
     chunk_size=2**20,
     jobs=1
@@ -56,7 +90,7 @@ def dirhash(
             `dirhash.algorithms_available` for the available options.
             It is also possible to provide a callable object that returns an instance
             implementing the `hashlib._hashlib.HASH` interface.
-        filtering: Optional[Union[dirhash.Filter, Dict[str, str]]] - An instance of
+        filter_: Optional[Union[dirhash.Filter, Dict[str, str]]] - An instance of
             dirhash.Filter or a dictionary of keyword arguments for the same.
             Determines what paths within the `directory` to include when computing
             the hash value. Default `None`, which means that all files and
@@ -115,9 +149,15 @@ def dirhash(
         See https://github.com/andhus/dirhash/README.md for a formal
         description of how the returned hash value is computed.
     """
+    def get_instance(value, cls_, argname):
+        if isinstance(value, cls_):
+            return value
+        if value is None:
+            return cls_()
+        raise TypeError('{} must be an instance of {} or None'.format(argname, cls_))
 
-    filter_ = _get_instance('filtering', filtering, Filter)
-    protocol = _get_instance('protocol', protocol, Protocol)
+    filter_ = get_instance(filter_, Filter, 'filter_')
+    protocol = get_instance(protocol, Protocol, 'protocol')
     hasher_factory = _get_hasher_factory(algorithm)
 
     def dir_apply(dir_node):
@@ -194,8 +234,12 @@ def dirhash(
 
 def included_paths(
     directory,
-    filtering=None,
-    protocol=None
+    match=("*",),
+    ignore=None,
+    linked_dirs=True,
+    linked_files=True,
+    empty_dirs=False,
+    allow_cyclic_links=False,
 ):
     """Inspect what paths are included for the corresponding arguments to the
     `dirhash.dirhash` function.
@@ -209,8 +253,13 @@ def included_paths(
         List[str] - A sorted list of the paths that would be included when computing
         the hash of `directory` using `dirhash.dirhash` and the same arguments.
     """
-    protocol = _get_instance('protocol', protocol, Protocol)
-    filter_ = _get_instance('filtering', filtering, Filter)
+    filter_ = Filter(
+        match=get_match_patterns(match=match, ignore=ignore),
+        linked_dirs=linked_dirs,
+        linked_files=linked_files,
+        empty_dirs=empty_dirs
+    )
+    protocol = Protocol(allow_cyclic_links=allow_cyclic_links)
 
     leafpaths = scantree(
         directory,
@@ -470,19 +519,6 @@ def _parmap(func, iterable, jobs=1):
         pool.close()
 
     return results
-
-
-def _get_instance(argname, instance_or_kwargs, cls):
-    if instance_or_kwargs is None:
-        return cls()
-    if isinstance(instance_or_kwargs, dict):
-        return cls(**instance_or_kwargs)
-    if isinstance(instance_or_kwargs, cls):
-        return instance_or_kwargs
-    raise TypeError(
-        'argument {argname} must be an instance of, or kwargs for, '
-        '{cls}'.format(argname=argname, cls=cls)
-    )
 
 
 def _get_filehash(filepath, hasher_factory, chunk_size, cache=None):

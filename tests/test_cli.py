@@ -88,38 +88,38 @@ class TestCLI(object):
             # Filtering options
             (
                 '. -a md5 -m "*" "!.*"',
-                {'filtering': {'match': ['*', '!.*']}}
+                {'match': ['*', '!.*']}
             ),
             (
                 '. -a md5 --match "d1/*" "d2/*" --ignore "*.txt"',
-                {'filtering': {'match': ['d1/*', 'd2/*', '!*.txt']}}
+                {'match': ['d1/*', 'd2/*'], 'ignore': ['*.txt']}
             ),
             (
                 '. -a md5 --empty-dirs',
-                {'filtering': {'empty_dirs': True}}
+                {'empty_dirs': True}
             ),
             (
                 '. -a md5 --no-linked-dirs',
-                {'filtering': {'linked_dirs': False}}
+                {'linked_dirs': False}
             ),
             (
                 '. -a md5 --no-linked-files',
-                {'filtering': {'linked_files': False}}
+                {'linked_files': False}
             ),
             # Protocol options
             (
                 '. -a md5 --allow-cyclic-links',
-                {'protocol': {'allow_cyclic_links': True}}
+                {'allow_cyclic_links': True}
 
             ),
             (
                 '. -a md5 --properties name',
-                {'protocol': {'entry_properties': ['name']}}
+                {'entry_properties': ['name']}
 
             ),
             (
                 '. -a md5 --properties name data',
-                {'protocol': {'entry_properties': ['name', 'data']}}
+                {'entry_properties': ['name', 'data']}
 
             ),
             # Implementation
@@ -135,29 +135,23 @@ class TestCLI(object):
     )
     def test_get_kwargs(self, argstring, non_default_kwargs):
         from dirhash.cli import get_kwargs
-        filter_kwargs = {
-            'match': ['*'],
-            'empty_dirs': False,
-            'linked_dirs': True,
-            'linked_files': True
-        }
-        protocol_kwargs = {
-            'entry_properties': ['data', 'name'],
-            'allow_cyclic_links': False
-        }
-        filter_kwargs.update(non_default_kwargs.pop('filtering', {}))
-        protocol_kwargs.update(non_default_kwargs.pop('protocol', {}))
-        kwargs = {
+        kwargs_expected = {
             'list': False,
             'directory': '.',
             'algorithm': 'md5',
-            'filtering': filter_kwargs,
-            'protocol': protocol_kwargs,
+            'match': ['*'],
+            'ignore': None,
+            'empty_dirs': False,
+            'linked_dirs': True,
+            'linked_files': True,
+            'entry_properties': ['data', 'name'],
+            'allow_cyclic_links': False,
             'chunk_size': 2 ** 20,
             'jobs': 1
         }
-        kwargs.update(non_default_kwargs)
-        assert kwargs == get_kwargs(shlex.split(argstring))
+        kwargs_expected.update(non_default_kwargs)
+        kwargs = get_kwargs(shlex.split(argstring))
+        assert kwargs == kwargs_expected
 
     @pytest.mark.parametrize(
         'description, argstrings, output',
@@ -244,8 +238,8 @@ class TestCLI(object):
                 ['', ' -p data', ' -p name'],
                 [
                     {},
-                    {'protocol': {'entry_properties': ['data']}},
-                    {'protocol': {'entry_properties': ['name']}},
+                    {'entry_properties': ['data']},
+                    {'entry_properties': ['name']},
                 ],
                 expected_hashes
             ):
