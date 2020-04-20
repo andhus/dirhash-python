@@ -277,6 +277,7 @@ class TestGetIncludedPaths(TempDirTest):
     def test_exclude_hidden_dirs(self):
         self.mkdirs('root/d1')
         self.mkdirs('root/.d2')
+        self.mkdirs('root/d1/.d1')
 
         self.mkfile('root/f1')
         self.mkfile('root/.f2')
@@ -285,8 +286,8 @@ class TestGetIncludedPaths(TempDirTest):
         self.mkfile('root/.d2/f1')
 
         # no ignore
-        filepaths = included_paths(self.path_to('root'))
-        assert filepaths == ['.d2/f1', '.f2', 'd1/.f2', 'd1/f1', 'f1']
+        filepaths = included_paths(self.path_to('root'), empty_dirs=True)
+        assert filepaths == ['.d2/f1', '.f2', 'd1/.d1/.', 'd1/.f2', 'd1/f1', 'f1']
 
         # with ignore
         filepaths = included_paths(
