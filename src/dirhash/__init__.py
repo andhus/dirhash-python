@@ -105,14 +105,14 @@ def dirhash(
     # Path Selection and Filtering
         Provided glob/wildcard (".gitignore style") match-patterns determine what
         paths within the `directory` to include when computing the hash value. Paths
-        *relative to the root `directory` (i.e. excluding the name of the directory
-        itself) are matched against the patterns.
+        *relative to the root `directory`* (i.e. excluding the name of the root
+        directory itself) are matched against the patterns.
             The `match` argument represent what should be *included* - as opposed
-        to `ignore` patterns for which matches are *excluded*. Using `ignore` is
+        to the `ignore` argument for which matches are *excluded*. Using `ignore` is
         just short for adding the same patterns to the `match` argument with the
         prefix "!", i.e. the calls bellow are equivalent:
-            `dirhash(..., match=['*', '!<pattern>'])`
-            `dirhash(..., ignore=['<pattern>'])`
+            `dirhash(..., match=["*", "!<pattern>"])`
+            `dirhash(..., ignore=["<pattern>"])`
         To validate which paths are included, call `dirhash.included_paths` with
         the same values for the arguments: `match`, `ignore`, `linked_dirs`,
         `linked_files` and `empty_dirs` to get a list of all paths that will be
@@ -348,7 +348,7 @@ class Filter(RecursionFilter):
     # Arguments
         match: Iterable[str] - An iterable of glob/wildcard (".gitignore style")
             match patterns for selection of which files and directories to include.
-            Paths *relative to the root `directory` (i.e. excluding the name of the
+            Paths *relative to the root `directory`* (i.e. excluding the name of the
             root directory itself) are matched against the provided patterns. For
             example, to include all files, except for hidden ones use:
             `match=['*', '!.*']` Default `None` which is equivalent to `['*']`,

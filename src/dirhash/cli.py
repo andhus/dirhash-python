@@ -43,10 +43,11 @@ def get_kwargs(args):
         choices=dirhash.algorithms_available,
         default='md5',
         help=(
-            'Hashing algorithm to use. Always available: {}. Additionally available '
-            'on current platform: {}. Note that the same algorithm may appear '
-            'multiple times in this set under different names (thanks to '
-            'OpenSSL) [https://docs.python.org/2/library/hashlib.html]'.format(
+            'Hashing algorithm to use, by default "md5". Always available: {}. '
+            'Additionally available on current platform: {}. Note that the same '
+            'algorithm may appear multiple times in this set under different names '
+            '(thanks to OpenSSL) '
+            '[https://docs.python.org/2/library/hashlib.html]'.format(
                 sorted(dirhash.algorithms_guaranteed),
                 sorted(dirhash.algorithms_available - dirhash.algorithms_guaranteed)
             )
@@ -77,7 +78,7 @@ def get_kwargs(args):
         nargs='+',
         default=['*'],
         help=(
-            'String of match-patterns, separated by blank space. NOTE: patterns '
+            'One or several patterns for paths to include. NOTE: patterns '
             'with an asterisk must be in quotes ("*") or the asterisk '
             'preceded by an escape character (\*).'
         ),
@@ -88,7 +89,7 @@ def get_kwargs(args):
         nargs='+',
         default=None,
         help=(
-            'String of ignore-patterns, separated by blank space. NOTE: patterns '
+            'One or several patterns for paths to exclude. NOTE: patterns '
             'with an asterisk must be in quotes ("*") or the asterisk '
             'preceded by an escape character (\*).'
         ),
@@ -173,28 +174,6 @@ def get_kwargs(args):
     )
 
     return vars(parser.parse_args(args))
-
-
-# def preprocess_kwargs(kwargs):
-#     match_kwargs = {}
-#     for kwarg in ['match', 'ignore']:
-#         match_kwargs[kwarg] = kwargs.pop(kwarg)
-#     match_patterns = dirhash.get_match_patterns(**match_kwargs)
-#
-#     filtering_kwargs = {
-#         'match': match_patterns,
-#         'linked_dirs': kwargs.pop('linked_dirs'),
-#         'linked_files': kwargs.pop('linked_files'),
-#         'empty_dirs': kwargs.pop('empty_dirs'),
-#     }
-#     protocol_kwargs = {
-#         'allow_cyclic_links': kwargs.pop('allow_cyclic_links'),
-#         'entry_properties': kwargs.pop('properties') or ["data", "name"]
-#     }
-#     kwargs['filtering'] = filtering_kwargs
-#     kwargs['protocol'] = protocol_kwargs
-#
-#     return kwargs
 
 
 if __name__ == '__main__':  # pragma: no cover

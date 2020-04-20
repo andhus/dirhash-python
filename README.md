@@ -2,11 +2,10 @@
 [![codecov](https://codecov.io/gh/andhus/dirhash-python/branch/master/graph/badge.svg)](https://codecov.io/gh/andhus/dirhash-python)
 
 # dirhash
-A lightweight python module and tool for computing the hash of any
+A lightweight python module and CLI for computing the hash of any
 directory based on its files' structure and content.
-- Supports any hashing algorithm of Python's built-in `hashlib` module
-- `.gitignore` style "wildmatch" patterns for expressive filtering of files to 
-include/exclude.
+- Supports all hashing algorithms of Python's built-in `hashlib` module.
+- Glob/wildcard (".gitignore style") path matching for expressive filtering of files to include/exclude.
 - Multiprocessing for up to [6x speed-up](#performance)
 
 The hash is computed according to the [Dirhash Standard](https://github.com/andhus/dirhash), which is designed to allow for consistent and collision resistant generation/verification of directory hashes across implementations.
@@ -68,7 +67,7 @@ and executing `hashlib` code.
 The main effort to boost performance is support for multiprocessing, where the
 reading and hashing is parallelized over individual files.
 
-As a reference, let's compare the performance of the `dirhash` [CLI](https://github.com/andhus/dirhash/dirhash-python/cli.py) 
+As a reference, let's compare the performance of the `dirhash` [CLI](https://github.com/andhus/dirhash-python/cli.py) 
 with the shell command:
 
 `find path/to/folder -type f -print0 | sort -z | xargs -0 md5 | md5` 
