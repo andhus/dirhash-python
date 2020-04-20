@@ -797,15 +797,15 @@ class TestDirhash(TempDirTest):
             allow_cyclic_links=True
         )
 
-    # def test_pass_filtering_instance(self):
-    #     self.mkdirs('root')
-    #     self.mkfile('root/f1', '')
-    #     dirhash(self.path_to('root'), 'sha256', filtering=Filter())
-    #
-    # def test_pass_protocol_instance(self):
-    #     self.mkdirs('root')
-    #     self.mkfile('root/f1', '')
-    #     dirhash(self.path_to('root'), 'sha256', protocol=Protocol())
+    def test_pass_filtering_instance(self):
+        self.mkdirs('root')
+        self.mkfile('root/f1', '')
+        dirhash_impl(self.path_to('root'), 'sha256', filter_=Filter())
+
+    def test_pass_protocol_instance(self):
+        self.mkdirs('root')
+        self.mkfile('root/f1', '')
+        dirhash_impl(self.path_to('root'), 'sha256', protocol=Protocol())
 
     def test_raise_on_wrong_type(self):
         self.mkdirs('root')
