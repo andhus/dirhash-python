@@ -8,8 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 NIL
 
-## [0.2.0] - 2019-04-18
-Complies with [Dirhash Standard](https://github.com/andhus/dirhash) Version [0.1.0](https://github.com/andhus/dirhash/releases/0.1.0)
+## [0.2.0] - 2019-04-20
+Complies with [Dirhash Standard](https://github.com/andhus/dirhash) Version [0.1.0](https://github.com/andhus/dirhash/releases/v0.1.0)
 
 ### Added
 - A first implementation based on the formalized [Dirhash Standard](https://github.com/andhus/dirhash).
@@ -26,3 +26,7 @@ same directory**.
 the previous repository 
 [github.com/andhus/dirhash](https://github.com/andhus/dirhash) 
 which now contains the formal description of the Dirhash Standard.
+
+### Removed
+- All support for the `.dirhashignore` file. This seemed superfluous, please file an 
+issue if you need this feature.
