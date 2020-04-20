@@ -1,0 +1,51 @@
+,test_case,implementation,algorithm,workers,t_best,t_median,speed-up (median)
+0,flat_8_128MB,shell reference,md5,1,2.079,2.083,1.0
+1,flat_8_128MB,dirhash_impl,md5,1,1.734,1.945,1.0709511568123393
+2,flat_8_128MB,dirhash_impl,md5,2,0.999,1.183,1.760777683854607
+3,flat_8_128MB,dirhash_impl,md5,4,0.711,0.728,2.8612637362637368
+4,flat_8_128MB,dirhash_impl,md5,8,0.504,0.518,4.021235521235521
+5,flat_1k_1MB,shell reference,md5,1,3.383,3.679,1.0
+6,flat_1k_1MB,dirhash_impl,md5,1,1.846,1.921,1.9151483602290473
+7,flat_1k_1MB,dirhash_impl,md5,2,1.137,1.158,3.1770293609671847
+8,flat_1k_1MB,dirhash_impl,md5,4,0.74,0.749,4.911882510013351
+9,flat_1k_1MB,dirhash_impl,md5,8,0.53,0.534,6.889513108614231
+10,flat_32k_32kB,shell reference,md5,1,13.827,18.213,1.0
+11,flat_32k_32kB,dirhash_impl,md5,1,13.655,13.808,1.3190179606025494
+12,flat_32k_32kB,dirhash_impl,md5,2,3.276,3.33,5.469369369369369
+13,flat_32k_32kB,dirhash_impl,md5,4,2.409,2.421,7.522924411400249
+14,flat_32k_32kB,dirhash_impl,md5,8,2.045,2.086,8.731064237775648
+15,nested_1k_1MB,shell reference,md5,1,3.284,3.332,1.0
+16,nested_1k_1MB,dirhash_impl,md5,1,1.717,1.725,1.9315942028985504
+17,nested_1k_1MB,dirhash_impl,md5,2,1.026,1.034,3.222437137330754
+18,nested_1k_1MB,dirhash_impl,md5,4,0.622,0.633,5.263823064770932
+19,nested_1k_1MB,dirhash_impl,md5,8,0.522,0.529,6.29867674858223
+20,nested_32k_32kB,shell reference,md5,1,11.898,12.125,1.0
+21,nested_32k_32kB,dirhash_impl,md5,1,13.858,14.146,0.8571327583769263
+22,nested_32k_32kB,dirhash_impl,md5,2,2.781,2.987,4.059256779377302
+23,nested_32k_32kB,dirhash_impl,md5,4,1.894,1.92,6.315104166666667
+24,nested_32k_32kB,dirhash_impl,md5,8,1.55,1.568,7.732780612244897
+25,flat_8_128MB,shell reference,sha1,1,2.042,2.05,1.0
+26,flat_8_128MB,dirhash_impl,sha1,1,1.338,1.354,1.5140324963072376
+27,flat_8_128MB,dirhash_impl,sha1,2,0.79,0.794,2.5818639798488663
+28,flat_8_128MB,dirhash_impl,sha1,4,0.583,0.593,3.456998313659359
+29,flat_8_128MB,dirhash_impl,sha1,8,0.483,0.487,4.209445585215605
+30,flat_1k_1MB,shell reference,sha1,1,2.118,2.129,1.0
+31,flat_1k_1MB,dirhash_impl,sha1,1,1.39,1.531,1.3905943827563685
+32,flat_1k_1MB,dirhash_impl,sha1,2,0.925,0.932,2.2843347639484977
+33,flat_1k_1MB,dirhash_impl,sha1,4,0.614,0.629,3.384737678855326
+34,flat_1k_1MB,dirhash_impl,sha1,8,0.511,0.52,4.094230769230769
+35,flat_32k_32kB,shell reference,sha1,1,10.551,10.97,1.0
+36,flat_32k_32kB,dirhash_impl,sha1,1,4.663,4.76,2.304621848739496
+37,flat_32k_32kB,dirhash_impl,sha1,2,3.108,3.235,3.3910355486862445
+38,flat_32k_32kB,dirhash_impl,sha1,4,2.342,2.361,4.6463362981787375
+39,flat_32k_32kB,dirhash_impl,sha1,8,2.071,2.094,5.2387774594078325
+40,nested_1k_1MB,shell reference,sha1,1,2.11,2.159,1.0
+41,nested_1k_1MB,dirhash_impl,sha1,1,1.436,1.47,1.4687074829931972
+42,nested_1k_1MB,dirhash_impl,sha1,2,0.925,0.937,2.3041622198505864
+43,nested_1k_1MB,dirhash_impl,sha1,4,0.627,0.643,3.357698289269051
+44,nested_1k_1MB,dirhash_impl,sha1,8,0.516,0.527,4.096774193548386
+45,nested_32k_32kB,shell reference,sha1,1,3.982,7.147,1.0
+46,nested_32k_32kB,dirhash_impl,sha1,1,4.114,4.156,1.7196823869104911
+47,nested_32k_32kB,dirhash_impl,sha1,2,2.598,2.616,2.7320336391437308
+48,nested_32k_32kB,dirhash_impl,sha1,4,1.809,1.831,3.9033315128345167
+49,nested_32k_32kB,dirhash_impl,sha1,8,1.552,1.58,4.523417721518987

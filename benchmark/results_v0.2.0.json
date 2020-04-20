@@ -1,0 +1,402 @@
+[
+    {
+        "test_case": "flat_8_128MB",
+        "implementation": "shell reference",
+        "algorithm": "md5",
+        "workers": 1,
+        "t_best": 2.079,
+        "t_median": 2.083
+    },
+    {
+        "test_case": "flat_8_128MB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 1,
+        "t_best": 1.734,
+        "t_median": 1.945
+    },
+    {
+        "test_case": "flat_8_128MB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 2,
+        "t_best": 0.999,
+        "t_median": 1.183
+    },
+    {
+        "test_case": "flat_8_128MB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 4,
+        "t_best": 0.711,
+        "t_median": 0.728
+    },
+    {
+        "test_case": "flat_8_128MB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 8,
+        "t_best": 0.504,
+        "t_median": 0.518
+    },
+    {
+        "test_case": "flat_1k_1MB",
+        "implementation": "shell reference",
+        "algorithm": "md5",
+        "workers": 1,
+        "t_best": 3.383,
+        "t_median": 3.679
+    },
+    {
+        "test_case": "flat_1k_1MB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 1,
+        "t_best": 1.846,
+        "t_median": 1.921
+    },
+    {
+        "test_case": "flat_1k_1MB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 2,
+        "t_best": 1.137,
+        "t_median": 1.158
+    },
+    {
+        "test_case": "flat_1k_1MB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 4,
+        "t_best": 0.74,
+        "t_median": 0.749
+    },
+    {
+        "test_case": "flat_1k_1MB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 8,
+        "t_best": 0.53,
+        "t_median": 0.534
+    },
+    {
+        "test_case": "flat_32k_32kB",
+        "implementation": "shell reference",
+        "algorithm": "md5",
+        "workers": 1,
+        "t_best": 13.827,
+        "t_median": 18.213
+    },
+    {
+        "test_case": "flat_32k_32kB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 1,
+        "t_best": 13.655,
+        "t_median": 13.808
+    },
+    {
+        "test_case": "flat_32k_32kB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 2,
+        "t_best": 3.276,
+        "t_median": 3.33
+    },
+    {
+        "test_case": "flat_32k_32kB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 4,
+        "t_best": 2.409,
+        "t_median": 2.421
+    },
+    {
+        "test_case": "flat_32k_32kB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 8,
+        "t_best": 2.045,
+        "t_median": 2.086
+    },
+    {
+        "test_case": "nested_1k_1MB",
+        "implementation": "shell reference",
+        "algorithm": "md5",
+        "workers": 1,
+        "t_best": 3.284,
+        "t_median": 3.332
+    },
+    {
+        "test_case": "nested_1k_1MB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 1,
+        "t_best": 1.717,
+        "t_median": 1.725
+    },
+    {
+        "test_case": "nested_1k_1MB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 2,
+        "t_best": 1.026,
+        "t_median": 1.034
+    },
+    {
+        "test_case": "nested_1k_1MB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 4,
+        "t_best": 0.622,
+        "t_median": 0.633
+    },
+    {
+        "test_case": "nested_1k_1MB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 8,
+        "t_best": 0.522,
+        "t_median": 0.529
+    },
+    {
+        "test_case": "nested_32k_32kB",
+        "implementation": "shell reference",
+        "algorithm": "md5",
+        "workers": 1,
+        "t_best": 11.898,
+        "t_median": 12.125
+    },
+    {
+        "test_case": "nested_32k_32kB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 1,
+        "t_best": 13.858,
+        "t_median": 14.146
+    },
+    {
+        "test_case": "nested_32k_32kB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 2,
+        "t_best": 2.781,
+        "t_median": 2.987
+    },
+    {
+        "test_case": "nested_32k_32kB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 4,
+        "t_best": 1.894,
+        "t_median": 1.92
+    },
+    {
+        "test_case": "nested_32k_32kB",
+        "implementation": "dirhash",
+        "algorithm": "md5",
+        "workers": 8,
+        "t_best": 1.55,
+        "t_median": 1.568
+    },
+    {
+        "test_case": "flat_8_128MB",
+        "implementation": "shell reference",
+        "algorithm": "sha1",
+        "workers": 1,
+        "t_best": 2.042,
+        "t_median": 2.05
+    },
+    {
+        "test_case": "flat_8_128MB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 1,
+        "t_best": 1.338,
+        "t_median": 1.354
+    },
+    {
+        "test_case": "flat_8_128MB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 2,
+        "t_best": 0.79,
+        "t_median": 0.794
+    },
+    {
+        "test_case": "flat_8_128MB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 4,
+        "t_best": 0.583,
+        "t_median": 0.593
+    },
+    {
+        "test_case": "flat_8_128MB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 8,
+        "t_best": 0.483,
+        "t_median": 0.487
+    },
+    {
+        "test_case": "flat_1k_1MB",
+        "implementation": "shell reference",
+        "algorithm": "sha1",
+        "workers": 1,
+        "t_best": 2.118,
+        "t_median": 2.129
+    },
+    {
+        "test_case": "flat_1k_1MB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 1,
+        "t_best": 1.39,
+        "t_median": 1.531
+    },
+    {
+        "test_case": "flat_1k_1MB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 2,
+        "t_best": 0.925,
+        "t_median": 0.932
+    },
+    {
+        "test_case": "flat_1k_1MB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 4,
+        "t_best": 0.614,
+        "t_median": 0.629
+    },
+    {
+        "test_case": "flat_1k_1MB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 8,
+        "t_best": 0.511,
+        "t_median": 0.52
+    },
+    {
+        "test_case": "flat_32k_32kB",
+        "implementation": "shell reference",
+        "algorithm": "sha1",
+        "workers": 1,
+        "t_best": 10.551,
+        "t_median": 10.97
+    },
+    {
+        "test_case": "flat_32k_32kB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 1,
+        "t_best": 4.663,
+        "t_median": 4.76
+    },
+    {
+        "test_case": "flat_32k_32kB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 2,
+        "t_best": 3.108,
+        "t_median": 3.235
+    },
+    {
+        "test_case": "flat_32k_32kB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 4,
+        "t_best": 2.342,
+        "t_median": 2.361
+    },
+    {
+        "test_case": "flat_32k_32kB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 8,
+        "t_best": 2.071,
+        "t_median": 2.094
+    },
+    {
+        "test_case": "nested_1k_1MB",
+        "implementation": "shell reference",
+        "algorithm": "sha1",
+        "workers": 1,
+        "t_best": 2.11,
+        "t_median": 2.159
+    },
+    {
+        "test_case": "nested_1k_1MB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 1,
+        "t_best": 1.436,
+        "t_median": 1.47
+    },
+    {
+        "test_case": "nested_1k_1MB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 2,
+        "t_best": 0.925,
+        "t_median": 0.937
+    },
+    {
+        "test_case": "nested_1k_1MB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 4,
+        "t_best": 0.627,
+        "t_median": 0.643
+    },
+    {
+        "test_case": "nested_1k_1MB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 8,
+        "t_best": 0.516,
+        "t_median": 0.527
+    },
+    {
+        "test_case": "nested_32k_32kB",
+        "implementation": "shell reference",
+        "algorithm": "sha1",
+        "workers": 1,
+        "t_best": 3.982,
+        "t_median": 7.147
+    },
+    {
+        "test_case": "nested_32k_32kB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 1,
+        "t_best": 4.114,
+        "t_median": 4.156
+    },
+    {
+        "test_case": "nested_32k_32kB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 2,
+        "t_best": 2.598,
+        "t_median": 2.616
+    },
+    {
+        "test_case": "nested_32k_32kB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 4,
+        "t_best": 1.809,
+        "t_median": 1.831
+    },
+    {
+        "test_case": "nested_32k_32kB",
+        "implementation": "dirhash",
+        "algorithm": "sha1",
+        "workers": 8,
+        "t_best": 1.552,
+        "t_median": 1.58
+    }
+]
