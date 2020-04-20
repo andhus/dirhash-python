@@ -147,7 +147,7 @@ def dirhash(
         description of how the returned hash value is computed.
     """
     filter_ = Filter(
-        match=get_match_patterns(match=match, ignore=ignore),
+        match_patterns=get_match_patterns(match=match, ignore=ignore),
         linked_dirs=linked_dirs,
         linked_files=linked_files,
         empty_dirs=empty_dirs
@@ -320,7 +320,7 @@ def included_paths(
         the hash of the `directory` using `dirhash.dirhash` and the same arguments.
     """
     filter_ = Filter(
-        match=get_match_patterns(match=match, ignore=ignore),
+        match_patterns=get_match_patterns(match=match, ignore=ignore),
         linked_dirs=linked_dirs,
         linked_files=linked_files,
         empty_dirs=empty_dirs
@@ -365,7 +365,7 @@ class Filter(RecursionFilter):
     """
     def __init__(
         self,
-        match=None,
+        match_patterns=None,
         linked_dirs=True,
         linked_files=True,
         empty_dirs=False
@@ -373,7 +373,7 @@ class Filter(RecursionFilter):
         super(Filter, self).__init__(
             linked_dirs=linked_dirs,
             linked_files=linked_files,
-            match=match
+            match=match_patterns
         )
         self.empty_dirs = empty_dirs
 

@@ -15,7 +15,11 @@ from dirhash import (
     dirhash,
     algorithms_available,
     algorithms_guaranteed,
-    Protocol, _parmap, Filter, dirhash_impl)
+    Protocol,
+    _parmap,
+    Filter,
+    dirhash_impl
+)
 from scantree import SymlinkRecursionError
 
 
