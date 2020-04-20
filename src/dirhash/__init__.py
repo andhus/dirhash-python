@@ -178,7 +178,7 @@ def dirhash_impl(
 
     In contrast to `dirhash.dirhash`, this function accepts custom implementations of
     the `dirhash.Filter` and `dirhash.Protocol` classes.
-    
+
     # Arguments
         directory: Union[str, pathlib.Path] - Path to the directory to hash.
         algorithm: str - The name of the hashing algorithm to use. See

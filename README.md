@@ -18,7 +18,7 @@ pip install dirhash
 ```
 Or directly from source:
 ```commandline
-git clone git@github.com:andhus/dirhash-standard.git
+git clone git@github.com:andhus/dirhash-python.git
 pip install dirhash/
 ```
 
@@ -29,8 +29,8 @@ from dirhash import dirhash
 
 dirpath = "path/to/directory"
 dir_md5 = dirhash(dirpath, "md5")
-pyfiles_md5 = dirhash(dirpath, "md5", filtering={"match": ["*.py"]})
-no_hidden_sha1 = dirhash(dirpath, "sha1", filtering={"match": ["!.*", "!.*/"]})
+pyfiles_md5 = dirhash(dirpath, "md5", match=["*.py"])
+no_hidden_sha1 = dirhash(dirpath, "sha1", ignore=[".*", ".*/"])
 ```
 CLI:
 ```commandline
