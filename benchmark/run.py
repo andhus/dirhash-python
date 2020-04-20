@@ -6,6 +6,8 @@ import subprocess
 
 from statistics import median, mean
 
+from dirhash import __version__
+
 
 BENCHMARK_ROOT = os.path.abspath(
     os.path.join(__file__, os.pardir)
@@ -117,7 +119,7 @@ def get_reference_shell_cmd(dirpath, algorithm):
 
 
 def get_dirhash_shell_cmd(dirpath, algorithm, workers=1):
-    return 'dirhash {} -a {} -w {}'.format(dirpath, algorithm, workers)
+    return 'dirhash {} -a {} -j {}'.format(dirpath, algorithm, workers)
 
 
 def benchmark(dirpath, algorithm, **kwargs):
@@ -164,7 +166,9 @@ if __name__ == '__main__':
             result = benchmark(test_case, algorithm=alg, runs=5, repetitions=1)
             results.extend(result)
 
-    with open(os.path.join(BENCHMARK_ROOT, 'results.json'), 'w') as f:
+    result_fname = 'results_v{}'.format(__version__)
+
+    with open(os.path.join(BENCHMARK_ROOT, result_fname + '.json'), 'w') as f:
         json.dump(results, f, indent=4)
 
     try:
@@ -188,6 +192,6 @@ if __name__ == '__main__':
         print(df_hd_1w)
         print('\nAverage speedup multiprocess (8 workers): {}'.format(mean_speedup_8w))
         print(df_hd_8w)
-        df.to_csv(os.path.join(BENCHMARK_ROOT, 'results.csv'))
+        df.to_csv(os.path.join(BENCHMARK_ROOT, result_fname + '.csv'))
     except ImportError:
         pass

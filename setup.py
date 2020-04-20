@@ -2,7 +2,7 @@ import io
 import os
 from setuptools import setup, find_packages
 
-VERSION = '0.1.1'
+VERSION = '0.2.0'
 
 DESCRIPTION = 'Python module and CLI for hashing of file system directories.'
 
@@ -19,14 +19,11 @@ setup(
     description=DESCRIPTION,
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url='https://github.com/andhus/dirhash',
+    url='https://github.com/andhus/dirhash-python',
     author="Anders Huss",
     author_email="andhus@kth.se",
     license='MIT',
-    install_requires=[
-        'pathspec>=0.5.9',
-        'scandir>=1.9.0;python_version<"3.5"'
-    ],
+    install_requires=['scantree>=0.0.1'],
     packages=find_packages('src'),
     package_dir={'': 'src'},
     include_package_data=True,

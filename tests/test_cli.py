@@ -66,9 +66,92 @@ def create_default_tree(tmpdir):
 
 
 class TestCLI(object):
+    @pytest.mark.parametrize(
+        'argstring, non_default_kwargs',
+        [
+            (
+                '. -a md5',
+                {}
+            ),
+            (
+                '.. -a md5',
+                {'directory': '..'}
+            ),
+            (
+                'target-dir -a md5',
+                {'directory': 'target-dir'}
+            ),
+            (
+                '. -a sha256',
+                {'algorithm': 'sha256'}
+            ),
+            # Filtering options
+            (
+                '. -a md5 -m "*" "!.*"',
+                {'match': ['*', '!.*']}
+            ),
+            (
+                '. -a md5 --match "d1/*" "d2/*" --ignore "*.txt"',
+                {'match': ['d1/*', 'd2/*'], 'ignore': ['*.txt']}
+            ),
+            (
+                '. -a md5 --empty-dirs',
+                {'empty_dirs': True}
+            ),
+            (
+                '. -a md5 --no-linked-dirs',
+                {'linked_dirs': False}
+            ),
+            (
+                '. -a md5 --no-linked-files',
+                {'linked_files': False}
+            ),
+            # Protocol options
+            (
+                '. -a md5 --allow-cyclic-links',
+                {'allow_cyclic_links': True}
 
-    def test_preprocess_kwargs(self):
-        pass
+            ),
+            (
+                '. -a md5 --properties name',
+                {'entry_properties': ['name']}
+
+            ),
+            (
+                '. -a md5 --properties name data',
+                {'entry_properties': ['name', 'data']}
+
+            ),
+            # Implementation
+            (
+                '. -a md5 -j 10',
+                {'jobs': 10}
+            ),
+            (
+                '. -a md5 -s 32000',
+                {'chunk_size': 32000}
+            ),
+        ]
+    )
+    def test_get_kwargs(self, argstring, non_default_kwargs):
+        from dirhash.cli import get_kwargs
+        kwargs_expected = {
+            'list': False,
+            'directory': '.',
+            'algorithm': 'md5',
+            'match': ['*'],
+            'ignore': None,
+            'empty_dirs': False,
+            'linked_dirs': True,
+            'linked_files': True,
+            'entry_properties': ['data', 'name'],
+            'allow_cyclic_links': False,
+            'chunk_size': 2 ** 20,
+            'jobs': 1
+        }
+        kwargs_expected.update(non_default_kwargs)
+        kwargs = get_kwargs(shlex.split(argstring))
+        assert kwargs == kwargs_expected
 
     @pytest.mark.parametrize(
         'description, argstrings, output',
@@ -78,9 +161,8 @@ class TestCLI(object):
               '. --list',
               '. -a md5 --list',
               '. -a sha256 --list',
-              '. --content-only --list',
-              '. --paths-only --list',
-              '. --workers 2 --list',
+              '. --properties name --list',
+              '. --jobs 2 --list',
               '. --chunk-size 2 --list'],
              ('.dir/file\n'
               '.file\n'
@@ -89,37 +171,30 @@ class TestCLI(object):
               'file.ext1\n'
               'file.ext2\n')),
             ('IGNORE EXTENSION',
-             ['. -x .ext1 --list',
-              '. --ignore-extensions .ext1 --list',
-              '. -i "*.ext1" --list',
+             ['. -i "*.ext1" --list',
               '. --ignore "*.ext1" --list',
-              '. -m "* !*.ext1" --list',
-              '. --match "* !*.ext1" --list'],
+              '. -m "*" "!*.ext1" --list',
+              '. --match "*" "!*.ext1" --list'],
              ('.dir/file\n'
               '.file\n'
               'dir/file\n'
               'file\n'
               'file.ext2\n')),
             ('IGNORE MULTIPLE EXTENSIONS',
-             ['. -x .ext1 .ext2 --list',
-              '. -x ".ext1 .ext2" --list',
-              '. --ignore-extensions .ext1 .ext2 --list',
-              '. -i "*.ext1 *.ext2" --list',
+             ['. -i "*.ext1" "*.ext2" --list',
               '. -i "*.ext*" --list'],
              ('.dir/file\n'
               '.file\n'
               'dir/file\n'
               'file\n')),
             ('IGNORE HIDDEN',
-             ['. -d --list',
-              '. --ignore-hidden --list',
-              '. -i ".* .*/" --list'],
+             ['. -i ".*" ".*/" --list'],
              ('dir/file\n'
               'file\n'
               'file.ext1\n'
               'file.ext2\n')),
             ('INCLUDE EMPTY',
-             ['. --include-empty --list'],
+             ['. --empty-dirs --list'],
              ('.dir/file\n'
               '.file\n'
               'dir/file\n'
@@ -138,104 +213,20 @@ class TestCLI(object):
                 assert error == ''
                 assert o == output
 
-    def test_root_dirhashignore(self, tmpdir):
-        create_default_tree(tmpdir)
-        with tmpdir.as_cwd():
-            output, error, returncode = dirhash_run('. --list')
-        assert returncode == 0
-        assert error == ''
-        assert output == (
-            '.dir/file\n'
-            '.file\n'
-            'dir/file\n'
-            'file\n'
-            'file.ext1\n'
-            'file.ext2\n'
-        )
-
-        tmpdir.join(dirhash.ignorefilename).write('*.ext*')
-        with tmpdir.as_cwd():
-            output, error, returncode = dirhash_run('. --list')
-        assert returncode == 0
-        assert error == ''
-        assert output == (
-            '.dir/file\n'
-            '.dirhashignore\n'
-            '.file\n'
-            'dir/file\n'
-            'file\n'
-        )
-
-        tmpdir.join(dirhash.ignorefilename).write('*.ext*\n#comment\n.*/\n')
-        with tmpdir.as_cwd():
-            output, error, returncode = dirhash_run('. --list')
-        assert returncode == 0
-        assert error == ''
-        assert output == (
-            '.dirhashignore\n'
-            '.file\n'
-            'dir/file\n'
-            'file\n'
-        )
-
-    def test_remote_dirhashignore(self, tmpdir):
-        rootdir = tmpdir.mkdir('root')
-        create_default_tree(rootdir)
-        remote_dirhashignore = tmpdir.join('my_hashignore')
-        remote_dirhashignore.write('*.ext*\n#comment\n.*/\n')
-
-        with rootdir.as_cwd():
-            output, error, returncode = dirhash_run('. --list')
-        assert returncode == 0
-        assert error == ''
-        assert output == (
-            '.dir/file\n'
-            '.file\n'
-            'dir/file\n'
-            'file\n'
-            'file.ext1\n'
-            'file.ext2\n'
-        )
-
-        with rootdir.as_cwd():
-            output, error, returncode = dirhash_run(
-                '. --list', add_env={'DIRHASH_IGNORE': str(remote_dirhashignore)}
-            )
-        assert returncode == 0
-        assert error == ''
-        assert output == (
-            '.file\n'
-            'dir/file\n'
-            'file\n'
-        )
-
-    def test_error_on_remote_dirhashignore_does_not_exist(self, tmpdir):
-        rootdir = tmpdir.mkdir('root')
-        create_default_tree(rootdir)
-        remote_dirhashignore = tmpdir.join('non_existing_hashignore')
-        with rootdir.as_cwd():
-            output, error, returncode = dirhash_run(
-                '. --list', add_env={'DIRHASH_IGNORE': str(remote_dirhashignore)}
-            )
-            assert returncode == 1
-            assert error.startswith('dirhash: DIRHASH_IGNORE=')
-            assert error.endswith(': No such file\n')
-            assert output == ''
-
     @pytest.mark.parametrize(
         'argstring, kwargs, expected_hashes',
         [
             ('. -a md5',
              {'algorithm': 'md5'},
-             ['e0d03dd48ab90d232ffabc0da9f08745',
-              'fd1cc95ac2207c3f7d72c18fe01c675e',
-              '0e4a5d4f8c1e4fda174a04c5693c6ea1']
+             ['594c48dde0776b03eddeeb0232190be7',
+              'd8ab965636d48e407b73b9dbba4cb928',
+              '050e7bc9ffcb09c15186c04e0f8026df']
              ),
             ('. -a sha256',
              {'algorithm': 'sha256'},
-             ['f25c5dd69d60c1f127481407829c23e2be87df9d28d3c3e9d353b68cd4f7462d',
-              'd444e19712ed1e318917b73a3623b9360e8489854d65586d3b74a6894e980b42',
-              '8ab8e97f1bca5491c355c22f5f0236079f774e5d19454020d76becaf0c03c346']),
+             ['23a04964149889e932ba3348fe22442f4f6a3b3fec616a386a70579ee857ab7b',
+              '7b76bac43e963f9561f37b96b92d7a174094bff230c6efbf1d8bf650e8b40b7a',
+              '7156da2b2e5a2926eb4b72e65f389343cb6aca0578f0aedcd6f7457abd67d8f5']),
         ]
     )
     def test_hash_result(self, argstring, kwargs, expected_hashes, tmpdir):
@@ -244,8 +235,12 @@ class TestCLI(object):
         create_default_tree(tmpdir)
         with tmpdir.as_cwd():
             for add_argstring, add_kwargs, expected_hash in zip(
-                ['', ' --content-only', ' --paths-only'],
-                [{}, {'content_only': True}, {'paths_only': True}],
+                ['', ' -p data', ' -p name'],
+                [
+                    {},
+                    {'entry_properties': ['data']},
+                    {'entry_properties': ['name']},
+                ],
                 expected_hashes
             ):
                 # run CLI
@@ -257,7 +252,7 @@ class TestCLI(object):
                 cli_hash = cli_out[:-1]
 
                 # run CLI multiproc
-                full_argstring_mp = argstring + add_argstring + ' --workers 2'
+                full_argstring_mp = argstring + add_argstring + ' --jobs 2'
                 cli_out_mp, error_mp, returncode_mp = dirhash_run(full_argstring_mp)
                 assert error_mp == ''
                 assert returncode_mp == 0
@@ -270,3 +265,9 @@ class TestCLI(object):
                 lib_hash = dirhash.dirhash(str(tmpdir), **full_kwargs)
 
                 assert cli_hash == cli_hash_mp == lib_hash == expected_hash
+
+    def test_error_bad_argument(self, tmpdir):
+        with tmpdir.as_cwd():
+            o, error, returncode = dirhash_run('. --chunk-size not_an_int')
+            assert returncode > 0
+            assert error != ''
