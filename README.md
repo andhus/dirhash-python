@@ -67,7 +67,7 @@ and executing `hashlib` code.
 The main effort to boost performance is support for multiprocessing, where the
 reading and hashing is parallelized over individual files.
 
-As a reference, let's compare the performance of the `dirhash` [CLI](https://github.com/andhus/dirhash-python/tree/master/cli.py) 
+As a reference, let's compare the performance of the `dirhash` [CLI](https://github.com/andhus/dirhash-python/blob/master/src/dirhash/cli.py) 
 with the shell command:
 
 `find path/to/folder -type f -print0 | sort -z | xargs -0 md5 | md5` 
@@ -91,4 +91,4 @@ shell reference     | nested_32k_32kB | 6.82     | -> 1.0
 The benchmark was run a MacBook Pro (2018), further details and source code [here](https://github.com/andhus/dirhash-python/tree/master/benchmark).
 
 ## Documentation
-Please refer to `dirhash -h`, the python [source code](https://github.com/andhus/dirhash/dirhash-python/tree/master/__init__.py) and the [Dirhash Standard](https://github.com/andhus/dirhash).
+Please refer to `dirhash -h`, the python [source code](https://github.com/andhus/dirhash-python/blob/master/src/dirhash/__init__.py) and the [Dirhash Standard](https://github.com/andhus/dirhash).
