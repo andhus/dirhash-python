@@ -2,11 +2,14 @@ import io
 import os
 from setuptools import setup, find_packages
 
-VERSION = '0.2.0'
+PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
+
+version = {}
+with io.open(os.path.join(PROJECT_ROOT, "src", "dirhash", "version.py") as fp:
+    exec(fp.read(), version)
 
 DESCRIPTION = 'Python module and CLI for hashing of file system directories.'
 
-PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
 try:
     with io.open(os.path.join(PROJECT_ROOT, 'README.md'), encoding='utf-8') as f:
         long_description = '\n' + f.read()
@@ -15,7 +18,7 @@ except IOError:
 
 setup(
     name='dirhash',
-    version=VERSION,
+    version=version['__version__'],
     description=DESCRIPTION,
     long_description=long_description,
     long_description_content_type="text/markdown",

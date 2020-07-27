@@ -16,6 +16,8 @@ from scantree import (
     CyclicLinkedDir,
 )
 
+from dirhash.version import __version__
+
 __all__ = [
     '__version__',
     'algorithms_guaranteed',
@@ -28,7 +30,6 @@ __all__ = [
     'Protocol'
 ]
 
-__version__ = pkg_resources.require("dirhash")[0].version
 
 algorithms_guaranteed = {'md5', 'sha1', 'sha224', 'sha256', 'sha384', 'sha512'}
 algorithms_available = hashlib.algorithms_available
