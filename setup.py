@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
 
 version = {}
-with io.open(os.path.join(PROJECT_ROOT, "src", "dirhash", "version.py") as fp:
+with io.open(os.path.join(PROJECT_ROOT, "src", "dirhash", "version.py")) as fp:
     exec(fp.read(), version)
 
 DESCRIPTION = 'Python module and CLI for hashing of file system directories.'
