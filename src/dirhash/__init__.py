@@ -78,7 +78,7 @@ def dirhash(
             "name" and "data" must be included. Default is ["name", "data"] which
             means that the content (actual data) as well as the path relative to the
             root `directory` of files will affect the hash value. See "Entry
-            Properties Interpretation" section below for further details. 
+            Properties Interpretation" section below for further details.
         allow_cyclic_links: bool - If `False` (default) a `SymlinkRecursionError` is
             raised on presence of cyclic symbolic links. If set to `True` the the
             dirhash value for directory causing the cyclic link is replaced with the
