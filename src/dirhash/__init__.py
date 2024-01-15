@@ -5,7 +5,6 @@ from __future__ import print_function, division
 
 import os
 import hashlib
-import pkg_resources
 
 from functools import partial
 from multiprocessing import Pool
