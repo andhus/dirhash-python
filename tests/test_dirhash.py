@@ -132,7 +132,7 @@ class TestGetMatchPatterns(object):
 
 class TempDirTest(object):
 
-    def setup(self):
+    def setup_method(self):
         self.dir = tempfile.mkdtemp()
 
     def tear_down(self):

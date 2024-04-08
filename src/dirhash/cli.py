@@ -80,7 +80,7 @@ def get_kwargs(args):
         help=(
             'One or several patterns for paths to include. NOTE: patterns '
             'with an asterisk must be in quotes ("*") or the asterisk '
-            'preceded by an escape character (\*).'
+            'preceded by an escape character (`*).'
         ),
         metavar=''
     )
@@ -91,7 +91,7 @@ def get_kwargs(args):
         help=(
             'One or several patterns for paths to exclude. NOTE: patterns '
             'with an asterisk must be in quotes ("*") or the asterisk '
-            'preceded by an escape character (\*).'
+            'preceded by an escape character (`*).'
         ),
         metavar=''
     )

@@ -32,7 +32,7 @@ jobs:
         python -m pip install tox tox-gh-actions
     - name: Cache tox environments
       id: cache-tox
-      uses: actions/cache@v1
+      uses: actions/cache@v4
       with:
         path: .tox
         # setup.py and setup.cfg have versioning info that would impact the
@@ -41,7 +41,7 @@ jobs:
         key: ${{ runner.os }}-${{ matrix.python-version }}-tox-${{ hashFiles('setup.py') }}-${{ hashFiles('setup.cfg') }} }}
     - name: Test with tox
       run: tox
-    - uses: codecov/codecov-action@v3
+    - uses: codecov/codecov-action@v4
       env:
         token: ${{ secrets.CODECOV_TOKEN }}
       with:
