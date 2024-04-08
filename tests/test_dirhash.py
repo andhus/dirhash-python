@@ -42,9 +42,19 @@ class TestGetHasherFactory(object):
     def test_get_available(self):
         for algorithm in algorithms_available:
             hasher_factory = _get_hasher_factory(algorithm)
-            hasher = hasher_factory()
-            assert hasattr(hasher, 'update')
-            assert hasattr(hasher, 'hexdigest')
+            try:
+                hasher = hasher_factory()
+            except ValueError as exc:
+                # Some "available" algorithms are not necessarily available (fails for e.g.
+                # 'ripemd160' in github actions for python 3.8). See:
+                # https://stackoverflow.com/questions/72409563/unsupported-hash-type-ripemd160-with-hashlib-in-python  # noqa
+                print(f"Failed to create hasher for {algorithm}: {exc}")
+                assert exc.args[0] == f"unsupported hash type {algorithm}"
+                hasher = None
+            
+            if hasher is not None:
+                assert hasattr(hasher, 'update')
+                assert hasattr(hasher, 'hexdigest')
 
     def test_not_available(self):
         with pytest.raises(ValueError):
