@@ -145,7 +145,7 @@ class TempDirTest(object):
     def setup_method(self):
         self.dir = tempfile.mkdtemp()
 
-    def tear_down(self):
+    def teardown_method(self):
         if os.path.exists(self.dir):
             shutil.rmtree(self.dir)
 
@@ -703,19 +703,19 @@ class TestDirhash(TempDirTest):
         for i in range(num_files):
             self.mkfile('root/file_{}'.format(i), '< one chunk content')
 
-        expected_min_elapsed = SlowHasher.wait_time * num_files
+        expected_min_elapsed_sequential = SlowHasher.wait_time * num_files
 
         start = time()
         dirhash(self.path_to('root'), algorithm=SlowHasher)
         end = time()
         elapsed_sequential = end - start
-        assert elapsed_sequential > expected_min_elapsed
+        assert elapsed_sequential > expected_min_elapsed_sequential
 
         start = time()
         dirhash(self.path_to('root'), algorithm=SlowHasher, jobs=num_files)
         end = time()
         elapsed_muliproc = end - start
-        assert elapsed_muliproc < expected_min_elapsed
+        assert elapsed_muliproc < 0.9 * expected_min_elapsed_sequential
         # just check "any speedup", the overhead varies (and is high on Travis)
 
     def test_cache_by_real_path_speedup(self, tmpdir):
@@ -729,13 +729,13 @@ class TestDirhash(TempDirTest):
             file_i.write('< one chunk content', ensure=True)
 
         wait_time = SlowHasher.wait_time
-        expected_min_elapsed = wait_time * num_links
+        expected_min_elapsed_no_links = wait_time * num_links
         start = time()
         dirhash(root1, algorithm=SlowHasher)
         end = time()
-        elapsed_sequential = end - start
-        assert elapsed_sequential > expected_min_elapsed
-        overhead = elapsed_sequential - expected_min_elapsed
+        elapsed_no_links = end - start
+        assert elapsed_no_links > expected_min_elapsed_no_links
+        overhead = elapsed_no_links - expected_min_elapsed_no_links
 
         # all links to same file
         root2 = tmpdir.join('root2')
@@ -746,13 +746,13 @@ class TestDirhash(TempDirTest):
             root2.join('link_{}'.format(i)).mksymlinkto(target_file)
 
         overhead_margin_factor = 1.5
-        expected_max_elapsed = overhead * overhead_margin_factor + wait_time
-        assert expected_max_elapsed < expected_min_elapsed
+        expected_max_elapsed_with_links = overhead * overhead_margin_factor + wait_time
+        assert expected_max_elapsed_with_links < expected_min_elapsed_no_links
         start = time()
         dirhash(root2, algorithm=SlowHasher)
         end = time()
-        elapsed_cache = end - start
-        assert elapsed_cache < expected_max_elapsed
+        elapsed_with_links = end - start
+        assert elapsed_with_links < expected_max_elapsed_with_links
 
     def test_cache_together_with_multiprocess_speedup(self, tmpdir):
         target_file_names = ['target_file_1', 'target_file_2']
@@ -768,13 +768,13 @@ class TestDirhash(TempDirTest):
 
         jobs = 2
         wait_time = SlowHasher.wait_time
-        expected_min_elapsed = wait_time * num_links / jobs
+        expected_min_elapsed_no_links = wait_time * num_links / jobs
         start = time()
         dirhash(root1, algorithm=SlowHasher, jobs=jobs)
         end = time()
-        elapsed_sequential = end - start
-        assert elapsed_sequential > expected_min_elapsed
-        overhead = elapsed_sequential - expected_min_elapsed
+        elapsed_no_links = end - start
+        assert elapsed_no_links > expected_min_elapsed_no_links
+        overhead = elapsed_no_links - expected_min_elapsed_no_links
 
         root2 = tmpdir.join('root2')
         root2.ensure(dir=True)
@@ -785,13 +785,13 @@ class TestDirhash(TempDirTest):
                 root2.join('link_{}_{}'.format(i, j)).mksymlinkto(target_file)
 
         overhead_margin_factor = 1.5
-        expected_max_elapsed = overhead * overhead_margin_factor + wait_time * 2
-        assert expected_max_elapsed < expected_min_elapsed
+        expected_max_elapsed_with_links = overhead * overhead_margin_factor + wait_time * 2
+        assert expected_max_elapsed_with_links < expected_min_elapsed_no_links
         start = time()
         dirhash(root2, algorithm=SlowHasher, jobs=jobs)
         end = time()
-        elapsed_mp_cache = end - start
-        assert elapsed_mp_cache < expected_max_elapsed
+        elapsed_mp_with_links = end - start
+        assert elapsed_mp_with_links < expected_max_elapsed_with_links
 
     def test_hash_cyclic_link_to_root(self):
         self.mkdirs('root/d1')
@@ -831,7 +831,7 @@ class TestDirhash(TempDirTest):
 
 
 class SlowHasher(object):
-    wait_time = 0.05
+    wait_time = 0.25
 
     def __init__(self, *args, **kwargs):
         pass
