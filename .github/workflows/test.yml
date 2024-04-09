@@ -41,7 +41,7 @@ jobs:
         key: ${{ runner.os }}-${{ matrix.python-version }}-tox-${{ hashFiles('setup.py') }}-${{ hashFiles('setup.cfg') }} }}
     - name: Test with tox
       run: tox
-    - uses: codecov/codecov-action@v4
+    - uses: codecov/codecov-action@v3
       env:
         token: ${{ secrets.CODECOV_TOKEN }}
       with:
