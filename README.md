@@ -1,4 +1,3 @@
-[![Build Status](https://travis-ci.com/andhus/dirhash-python.svg?branch=master)](https://travis-ci.com/andhus/dirhash-python)
 [![codecov](https://codecov.io/gh/andhus/dirhash-python/branch/master/graph/badge.svg)](https://codecov.io/gh/andhus/dirhash-python)
 
 # dirhash
