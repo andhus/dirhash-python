@@ -2,11 +2,9 @@ import io
 import os
 from setuptools import setup, find_packages
 
-PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
+import versioneer
 
-version = {}
-with io.open(os.path.join(PROJECT_ROOT, "src", "dirhash", "version.py")) as fp:
-    exec(fp.read(), version)
+PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
 
 DESCRIPTION = 'Python module and CLI for hashing of file system directories.'
 
@@ -18,7 +16,7 @@ except IOError:
 
 setup(
     name='dirhash',
-    version=version['__version__'],
+    version=versioneer.get_version(),
     description=DESCRIPTION,
     long_description=long_description,
     long_description_content_type="text/markdown",
