@@ -51,7 +51,7 @@ class TestGetHasherFactory(object):
                 print(f"Failed to create hasher for {algorithm}: {exc}")
                 assert exc.args[0] == f"unsupported hash type {algorithm}"
                 hasher = None
-            
+
             if hasher is not None:
                 assert hasattr(hasher, 'update')
                 assert hasattr(hasher, 'hexdigest')
@@ -267,7 +267,7 @@ class TestGetIncludedPaths(TempDirTest):
         with pytest.raises(SymlinkRecursionError):
             filepaths = included_paths(self.path_to('root'))
 
-    def test_ignore_hidden_files(self):
+    def test_ignore_hidden(self):
         self.mkdirs('root/d1')
         self.mkdirs('root/.d2')
 
@@ -282,11 +282,44 @@ class TestGetIncludedPaths(TempDirTest):
         assert filepaths == ['.d2/f1', '.f2', 'd1/.f2', 'd1/f1', 'f1']
 
         # with ignore
-        filepaths = included_paths(
-            self.path_to('root'),
-            match=['*', '!.*']
-        )
+        filepaths = included_paths(self.path_to('root'), match=['*', '!.*'])
+        assert filepaths == ['d1/f1', 'f1']
+
+    def test_ignore_hidden_files_only(self):
+        self.mkdirs('root/d1')
+        self.mkdirs('root/.d2')
+
+        self.mkfile('root/f1')
+        self.mkfile('root/.f2')
+        self.mkfile('root/d1/f1')
+        self.mkfile('root/d1/.f2')
+        self.mkfile('root/.d2/f1')
+
+        # no ignore
+        filepaths = included_paths(self.path_to('root'))
+        assert filepaths == ['.d2/f1', '.f2', 'd1/.f2', 'd1/f1', 'f1']
+
+        # with ignore
+        filepaths = included_paths(self.path_to('root'), match=['**/*', '!**/.*', '**/.*/*', '!**/.*/.*'])
         assert filepaths == ['.d2/f1', 'd1/f1', 'f1']
+
+    def test_ignore_hidden_explicitly_recursive(self):
+        self.mkdirs('root/d1')
+        self.mkdirs('root/.d2')
+
+        self.mkfile('root/f1')
+        self.mkfile('root/.f2')
+        self.mkfile('root/d1/f1')
+        self.mkfile('root/d1/.f2')
+        self.mkfile('root/.d2/f1')
+
+        # no ignore
+        filepaths = included_paths(self.path_to('root'))
+        assert filepaths == ['.d2/f1', '.f2', 'd1/.f2', 'd1/f1', 'f1']
+
+        # with ignore
+        filepaths = included_paths(self.path_to('root'), match=['*', '!**/.*'])
+        assert filepaths == ['d1/f1', 'f1']
 
     def test_exclude_hidden_dirs(self):
         self.mkdirs('root/d1')

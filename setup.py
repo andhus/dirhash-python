@@ -25,7 +25,7 @@ setup(
     author="Anders Huss",
     author_email="andhus@kth.se",
     license='MIT',
-    install_requires=['scantree>=0.0.2', 'pathspec<0.10.0'],
+    install_requires=['scantree>=0.0.2'],
     packages=find_packages('src'),
     package_dir={'': 'src'},
     include_package_data=True,
