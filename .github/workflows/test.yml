@@ -6,7 +6,7 @@ on:
       - "master"
   pull_request:
     branches:
-      - "*"
+      - "**"
   workflow_dispatch:
   release:
     types: [published, edited]
@@ -46,7 +46,9 @@ jobs:
           verbose: true
 
   # Always run this last as it can push new changes and actions will not rerun.
+  # not working on pull requests from forks
   pre-commit:
+    if: false
     permissions:
       contents: write
       pull-requests: write
