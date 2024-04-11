@@ -47,6 +47,9 @@ jobs:
 
   # Always run this last as it can push new changes and actions will not rerun.
   pre-commit:
+    permissions:
+      contents: write
+      pull-requests: write
     needs: [tests]
     runs-on: ubuntu-latest
     steps:
