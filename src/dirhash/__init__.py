@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-"""dirhash - a python library (and CLI) for hashing of file system directories.
-"""
+"""dirhash - a python library (and CLI) for hashing of file system directories."""
 
 import hashlib
 import os
@@ -458,9 +457,8 @@ class Protocol:
         entry_properties = set(entry_properties)
         if not entry_properties.issubset(self.EntryProperties.options):
             raise ValueError(
-                "entry properties {} not supported".format(
-                    entry_properties - self.EntryProperties.options
-                )
+                f"entry properties {entry_properties - self.EntryProperties.options} "
+                "not supported"
             )
         if not (
             self.EntryProperties.NAME in entry_properties
@@ -476,8 +474,7 @@ class Protocol:
 
         if not isinstance(allow_cyclic_links, bool):
             raise ValueError(
-                "allow_cyclic_link must be a boolean, "
-                "got {}".format(allow_cyclic_links)
+                f"allow_cyclic_link must be a boolean, got {allow_cyclic_links}"
             )
         self.allow_cyclic_links = allow_cyclic_links
 

@@ -60,9 +60,7 @@ def require_test_cases():
 
 
 def time_shell(cmd, runs=1, repetitions=1, setup=None):
-    time_cmd = "time for i in {{1..{rep}}}; do {cmd}; done".format(
-        cmd=cmd, rep=repetitions
-    )
+    time_cmd = f"time for i in {{1..{repetitions}}}; do {cmd}; done"
     if setup is not None:
         time_cmd = f"{setup}; {time_cmd}"
 
@@ -97,8 +95,8 @@ def get_reference_shell_cmd(dirpath, algorithm):
     else:
         raise ValueError("only md5 and sha supported")
 
-    return "find {dir} -type f -print0 | sort -z | xargs -0 {alg} | {alg}".format(
-        dir=dirpath, alg=algorithm
+    return (
+        f"find {dirpath} -type f -print0 | sort -z | xargs -0 {algorithm} | {algorithm}"
     )
 
 

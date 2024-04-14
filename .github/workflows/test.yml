@@ -40,65 +40,15 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.python-version }}-tox-${{ hashFiles('setup.py') }}-${{ hashFiles('setup.cfg') }} }}
       - name: Test with tox
         run: tox
+      - name: Commit and Push to Pull Request
+        if: matrix.python-version == 3.8
+        run: |
+          if [ -n "$(git status -s)" ]; then
+            git add .
+            git commit -m "✨ ⭐ Automated commit has been added to your pull request to fix formatting! ⭐ ✨"
+            git push origin ${{ github.head_ref }}
+          fi
       - uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
-
-  # Always run this last as it can push new changes and actions will not rerun.
-  # not working on pull requests from forks
-  pre-commit:
-    if: false
-    permissions:
-      contents: write
-      pull-requests: write
-    needs: [tests]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref }}
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.8"
-
-      - name: Install PreCommit
-        run: pip install pre-commit
-
-      - uses: actions/cache@v4
-        with:
-          path: ~/.cache/pre-commit
-          key: ${{ runner.os }}-pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pre-commit-
-
-      - name: PreCommit
-        id: pre-commit
-        run: |
-          if pre-commit run --show-diff-on-failure --color=always --all-files; then
-            echo "failed=0" >> $GITHUB_OUTPUT
-          else
-            echo "failed=1" >> $GITHUB_OUTPUT
-          fi
-          if [ -n "$(git status -s)" ]; then
-            echo "dirty=1" >> $GITHUB_OUTPUT
-          else
-            echo "dirty=0" >> $GITHUB_OUTPUT
-          fi
-
-      # Run a second time to verify that everything has indeed been fixed.
-      - name: PreCommit verify
-        if: steps.pre-commit.outputs.failed == 1
-        run: |
-          pre-commit run --show-diff-on-failure --color=always --all-files
-
-      - name: Commit and Push to Pull Request
-        if: steps.pre-commit.outputs.dirty == 1
-        run: |
-          git add .
-          git status
-          git commit -m "✨ ⭐ Automated commit has been added to your pull request to fix formatting! ⭐ ✨"
-          git push origin ${{ github.head_ref }}

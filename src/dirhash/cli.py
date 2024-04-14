@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-"""Get hash for the content and/or structure of a directory.
-"""
+"""Get hash for the content and/or structure of a directory."""
 
 import argparse
 import sys
@@ -39,14 +38,13 @@ def get_kwargs(args):
         choices=dirhash.algorithms_available,
         default="md5",
         help=(
-            'Hashing algorithm to use, by default "md5". Always available: {}. '
-            "Additionally available on current platform: {}. Note that the same "
-            "algorithm may appear multiple times in this set under different names "
-            "(thanks to OpenSSL) "
-            "[https://docs.python.org/2/library/hashlib.html]".format(
-                sorted(dirhash.algorithms_guaranteed),
-                sorted(dirhash.algorithms_available - dirhash.algorithms_guaranteed),
-            )
+            "Hashing algorithm to use, by default 'md5'. "
+            f"Always available: {sorted(dirhash.algorithms_guaranteed)}. "
+            f"Additionally available on current platform: "
+            f"{sorted(dirhash.algorithms_available - dirhash.algorithms_guaranteed)}. "
+            "Note that the same algorithm may appear multiple times in this set "
+            "under different names (thanks to OpenSSL) "
+            "[https://docs.python.org/2/library/hashlib.html]."
         ),
         metavar="",
     )
@@ -129,11 +127,12 @@ def get_kwargs(args):
         dest="entry_properties",
         default=["data", "name"],
         help=(
-            "List of file/directory properties to include in the hash. Available "
-            "properties are: {} and at least one of name and data must be "
-            "included. Default is [data name] which means that both the name/paths"
-            " and content (actual data) of files and directories will be included"
-        ).format(list(dirhash.Protocol.EntryProperties.options)),
+            "List of file/directory properties to include in the hash. "
+            f"Available properties are: {list(dirhash.Protocol.EntryProperties.options)} "
+            "and at least one of name and data must be included. "
+            "Default is [data name] which means that both the name/paths "
+            "and content (actual data) of files and directories will be included"
+        ),
         metavar="",
     )
     protocol_options.add_argument(

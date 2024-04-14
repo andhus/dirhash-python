@@ -22,7 +22,6 @@ from dirhash import (
 
 
 class TestGetHasherFactory:
-
     def test_get_guaranteed(self):
         algorithm_and_hasher_factory = [
             ("md5", hashlib.md5),
@@ -59,14 +58,12 @@ class TestGetHasherFactory:
             _get_hasher_factory("not available")
 
     def test_bypass_hasher_factory(self):
-
         # test standard hasher
         hasher_factory = _get_hasher_factory(hashlib.sha256)
         assert hasher_factory is hashlib.sha256
 
         # test raise on custom hasher with bad interface
         class IncompleteMockHasher:
-
             def __init__(self, *args, **kwargs):
                 pass
 
@@ -78,7 +75,6 @@ class TestGetHasherFactory:
 
         # test custom hasher with ok interface
         class MockHasher(IncompleteMockHasher):
-
             def hexdigest(self):
                 return ""
 
@@ -87,7 +83,6 @@ class TestGetHasherFactory:
 
 
 class TestGetMatchPatterns:
-
     def test_default_match_all(self):
         ms = get_match_patterns()
         assert ms == ["*"]
@@ -139,7 +134,6 @@ class TestGetMatchPatterns:
 
 
 class TempDirTest:
-
     def setup_method(self):
         self.dir = tempfile.mkdtemp()
 
@@ -441,7 +435,6 @@ def dirhash_mp_comp(*args, **kwargs):
 
 
 class TestDirhash(TempDirTest):
-
     def test_guaranteed_algorithms(self):
         self.mkdirs("root/d1/d11")
         self.mkdirs("root/d2")
@@ -545,7 +538,6 @@ class TestDirhash(TempDirTest):
         assert root1_linked_dirs_true == root2
 
     def test_cache_used_for_symlinks(self):
-
         self.mkdirs("root/dir")
         self.mkfile("root/file", "< one chunk content")
         for i in range(10):
@@ -667,7 +659,6 @@ class TestDirhash(TempDirTest):
             )
 
     def test_multiproc_speedup(self):
-
         self.mkdirs("root/dir")
         num_files = 10
         for i in range(num_files):
@@ -809,7 +800,6 @@ class SlowHasher:
 
 
 class IdentityHasher:
-
     def __init__(self, initial_data=b""):
         self.datas = [initial_data.decode("utf-8")]
 
@@ -821,7 +811,6 @@ class IdentityHasher:
 
 
 class TestProtocol:
-
     def test_raise_for_invalid_entry_properties(self):
         with pytest.raises(ValueError):
             Protocol(entry_properties=["not-valid"])
