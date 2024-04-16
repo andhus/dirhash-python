@@ -106,6 +106,8 @@ venv.bak/
 # Pycharm
 .idea/
 
+# VSC
+.vscode/
 
 # Project specific
 benchmark/test_cases/*

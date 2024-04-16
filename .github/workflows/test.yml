@@ -6,14 +6,13 @@ on:
       - "master"
   pull_request:
     branches:
-      - "*"
+      - "**"
   workflow_dispatch:
   release:
     types: [published, edited]
 
 jobs:
   tests:
-
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -21,27 +20,35 @@ jobs:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        python -m pip install tox tox-gh-actions
-    - name: Cache tox environments
-      id: cache-tox
-      uses: actions/cache@v4
-      with:
-        path: .tox
-        # setup.py and setup.cfg have versioning info that would impact the
-        # tox environment. hashFiles only takes a single file path or pattern
-        # at the moment.
-        key: ${{ runner.os }}-${{ matrix.python-version }}-tox-${{ hashFiles('setup.py') }}-${{ hashFiles('setup.cfg') }} }}
-    - name: Test with tox
-      run: tox
-    - uses: codecov/codecov-action@v4
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        verbose: true
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install tox tox-gh-actions
+      - name: Cache tox environments
+        id: cache-tox
+        uses: actions/cache@v4
+        with:
+          path: .tox
+          # setup.py and setup.cfg have versioning info that would impact the
+          # tox environment. hashFiles only takes a single file path or pattern
+          # at the moment.
+          key: ${{ runner.os }}-${{ matrix.python-version }}-tox-${{ hashFiles('setup.py') }}-${{ hashFiles('setup.cfg') }} }}
+      - name: Test with tox
+        run: tox
+      - name: Commit and Push to Pull Request
+        if: matrix.python-version == 3.8
+        run: |
+          if [ -n "$(git status -s)" ]; then
+            git add .
+            git commit -m "✨ ⭐ Automated commit has been added to your pull request to fix formatting! ⭐ ✨"
+            git push origin ${{ github.head_ref }}
+          fi
+      - uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true

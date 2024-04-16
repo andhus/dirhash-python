@@ -1,37 +1,31 @@
 #!/usr/bin/env python
-"""dirhash - a python library (and CLI) for hashing of file system directories.
-"""
-from __future__ import print_function, division
+"""dirhash - a python library (and CLI) for hashing of file system directories."""
 
-import os
 import hashlib
-
+import os
 from functools import partial
 from multiprocessing import Pool
 
-from scantree import (
-    scantree,
-    RecursionFilter,
-    CyclicLinkedDir,
-)
+from scantree import CyclicLinkedDir, RecursionFilter, scantree
 
 from . import _version
-__version__ = _version.get_versions()['version']
+
+__version__ = _version.get_versions()["version"]
 
 __all__ = [
-    '__version__',
-    'algorithms_guaranteed',
-    'algorithms_available',
-    'dirhash',
-    'dirhash_impl',
-    'included_paths',
-    'Filter',
-    'get_match_patterns',
-    'Protocol'
+    "__version__",
+    "algorithms_guaranteed",
+    "algorithms_available",
+    "dirhash",
+    "dirhash_impl",
+    "included_paths",
+    "Filter",
+    "get_match_patterns",
+    "Protocol",
 ]
 
 
-algorithms_guaranteed = {'md5', 'sha1', 'sha224', 'sha256', 'sha384', 'sha512'}
+algorithms_guaranteed = {"md5", "sha1", "sha224", "sha256", "sha384", "sha512"}
 algorithms_available = hashlib.algorithms_available
 
 
@@ -43,10 +37,10 @@ def dirhash(
     linked_dirs=True,
     linked_files=True,
     empty_dirs=False,
-    entry_properties=('name', 'data'),
+    entry_properties=("name", "data"),
     allow_cyclic_links=False,
     chunk_size=2**20,
-    jobs=1
+    jobs=1,
 ):
     """Computes the hash of a directory based on its structure and content.
 
@@ -151,11 +145,10 @@ def dirhash(
         match_patterns=get_match_patterns(match=match, ignore=ignore),
         linked_dirs=linked_dirs,
         linked_files=linked_files,
-        empty_dirs=empty_dirs
+        empty_dirs=empty_dirs,
     )
     protocol = Protocol(
-        entry_properties=entry_properties,
-        allow_cyclic_links=allow_cyclic_links
+        entry_properties=entry_properties, allow_cyclic_links=allow_cyclic_links
     )
     return dirhash_impl(
         directory=directory,
@@ -163,17 +156,12 @@ def dirhash(
         filter_=filter_,
         protocol=protocol,
         chunk_size=chunk_size,
-        jobs=jobs
+        jobs=jobs,
     )
 
 
 def dirhash_impl(
-    directory,
-    algorithm,
-    filter_=None,
-    protocol=None,
-    chunk_size=2**20,
-    jobs=1
+    directory, algorithm, filter_=None, protocol=None, chunk_size=2**20, jobs=1
 ):
     """Computes the hash of a directory based on its structure and content.
 
@@ -215,25 +203,26 @@ def dirhash_impl(
         See https://github.com/andhus/dirhash/README.md for a formal
         description of how the returned hash value is computed.
     """
+
     def get_instance(value, cls_, argname):
         if isinstance(value, cls_):
             return value
         if value is None:
             return cls_()
-        raise TypeError('{} must be an instance of {} or None'.format(argname, cls_))
+        raise TypeError(f"{argname} must be an instance of {cls_} or None")
 
-    filter_ = get_instance(filter_, Filter, 'filter_')
-    protocol = get_instance(protocol, Protocol, 'protocol')
+    filter_ = get_instance(filter_, Filter, "filter_")
+    protocol = get_instance(protocol, Protocol, "protocol")
     hasher_factory = _get_hasher_factory(algorithm)
 
     def dir_apply(dir_node):
         if not filter_.empty_dirs:
-            if dir_node.path.relative == '' and dir_node.empty:
+            if dir_node.path.relative == "" and dir_node.empty:
                 # only check if root node is empty (other empty dirs are filter
                 # before `dir_apply` with `filter_.empty_dirs=False`)
-                raise ValueError('{}: Nothing to hash'.format(directory))
+                raise ValueError(f"{directory}: Nothing to hash")
         descriptor = protocol.get_descriptor(dir_node)
-        _dirhash = hasher_factory(descriptor.encode('utf-8')).hexdigest()
+        _dirhash = hasher_factory(descriptor.encode("utf-8")).hexdigest()
 
         return dir_node.path, _dirhash
 
@@ -242,10 +231,7 @@ def dirhash_impl(
 
         def file_apply(path):
             return path, _get_filehash(
-                path.real,
-                hasher_factory,
-                chunk_size=chunk_size,
-                cache=cache
+                path.real, hasher_factory, chunk_size=chunk_size, cache=cache
             )
 
         _, dirhash_ = scantree(
@@ -257,7 +243,7 @@ def dirhash_impl(
             allow_cyclic_links=protocol.allow_cyclic_links,
             cache_file_apply=False,
             include_empty=filter_.empty_dirs,
-            jobs=1
+            jobs=1,
         )
     else:  # multiprocessing
         real_paths = set()
@@ -274,18 +260,16 @@ def dirhash_impl(
             allow_cyclic_links=protocol.allow_cyclic_links,
             cache_file_apply=False,
             include_empty=filter_.empty_dirs,
-            jobs=1
+            jobs=1,
         )
         real_paths = list(real_paths)
         # hash files in parallel
         file_hashes = _parmap(
             partial(
-                _get_filehash,
-                hasher_factory=hasher_factory,
-                chunk_size=chunk_size
+                _get_filehash, hasher_factory=hasher_factory, chunk_size=chunk_size
             ),
             real_paths,
-            jobs=jobs
+            jobs=jobs,
         )
         # prepare the mapping with precomputed file hashes
         real_path_to_hash = dict(zip(real_paths, file_hashes))
@@ -324,7 +308,7 @@ def included_paths(
         match_patterns=get_match_patterns(match=match, ignore=ignore),
         linked_dirs=linked_dirs,
         linked_files=linked_files,
-        empty_dirs=empty_dirs
+        empty_dirs=empty_dirs,
     )
     protocol = Protocol(allow_cyclic_links=allow_cyclic_links)
 
@@ -333,11 +317,11 @@ def included_paths(
         recursion_filter=filter_,
         follow_links=True,
         allow_cyclic_links=protocol.allow_cyclic_links,
-        include_empty=filter_.empty_dirs
+        include_empty=filter_.empty_dirs,
     ).leafpaths()
 
     return [
-        path.relative if path.is_file() else os.path.join(path.relative, '.')
+        path.relative if path.is_file() else os.path.join(path.relative, ".")
         for path in leafpaths
     ]
 
@@ -364,17 +348,12 @@ class Filter(RecursionFilter):
             that *matches provided matching criteria*. Default `False`, i.e. empty
             directories are ignored (as is done in git version control).
     """
+
     def __init__(
-        self,
-        match_patterns=None,
-        linked_dirs=True,
-        linked_files=True,
-        empty_dirs=False
+        self, match_patterns=None, linked_dirs=True, linked_files=True, empty_dirs=False
     ):
-        super(Filter, self).__init__(
-            linked_dirs=linked_dirs,
-            linked_files=linked_files,
-            match=match_patterns
+        super().__init__(
+            linked_dirs=linked_dirs, linked_files=linked_files, match=match_patterns
         )
         self.empty_dirs = empty_dirs
 
@@ -400,23 +379,23 @@ def get_match_patterns(
         ignore_hidden: bool - If `True` ignore hidden files and directories. Short
             for `ignore=['.*', '.*/']` Default `False`.
     """
-    match = ['*'] if match is None else list(match)
+    match = ["*"] if match is None else list(match)
     ignore = [] if ignore is None else list(ignore)
     ignore_extensions = [] if ignore_extensions is None else list(ignore_extensions)
 
     if ignore_hidden:
-        ignore.extend(['.*', '.*/'])
+        ignore.extend([".*", ".*/"])
 
     for ext in ignore_extensions:
-        if not ext.startswith('.'):
-            ext = '.' + ext
-        ext = '*' + ext
+        if not ext.startswith("."):
+            ext = "." + ext
+        ext = "*" + ext
         ignore.append(ext)
 
-    match_spec = match + ['!' + ign for ign in ignore]
+    match_spec = match + ["!" + ign for ign in ignore]
 
     def deduplicate(items):
-        items_set = set([])
+        items_set = set()
         dd_items = []
         for item in items:
             if item not in items_set:
@@ -428,7 +407,7 @@ def get_match_patterns(
     return deduplicate(match_spec)
 
 
-class Protocol(object):
+class Protocol:
     """Specifications of which file and directory properties to consider when
         computing the `dirhash` value.
 
@@ -463,33 +442,30 @@ class Protocol(object):
             dirhash value for directory causing the cyclic link is replaced with the
             hash function hexdigest of the relative path from the link to the target.
     """
-    class EntryProperties(object):
-        NAME = 'name'
-        DATA = 'data'
-        IS_LINK = 'is_link'
+
+    class EntryProperties:
+        NAME = "name"
+        DATA = "data"
+        IS_LINK = "is_link"
         options = {NAME, DATA, IS_LINK}
-        _DIRHASH = 'dirhash'
+        _DIRHASH = "dirhash"
 
-    _entry_property_separator = '\000'
-    _entry_descriptor_separator = '\000\000'
+    _entry_property_separator = "\000"
+    _entry_descriptor_separator = "\000\000"
 
-    def __init__(
-        self,
-        entry_properties=('name', 'data'),
-        allow_cyclic_links=False
-    ):
+    def __init__(self, entry_properties=("name", "data"), allow_cyclic_links=False):
         entry_properties = set(entry_properties)
         if not entry_properties.issubset(self.EntryProperties.options):
             raise ValueError(
-                'entry properties {} not supported'.format(
-                    entry_properties - self.EntryProperties.options)
+                f"entry properties {entry_properties - self.EntryProperties.options} "
+                "not supported"
             )
         if not (
-            self.EntryProperties.NAME in entry_properties or
-            self.EntryProperties.DATA in entry_properties
+            self.EntryProperties.NAME in entry_properties
+            or self.EntryProperties.DATA in entry_properties
         ):
             raise ValueError(
-                'at least one of entry properties `name` and `data` must be used'
+                "at least one of entry properties `name` and `data` must be used"
             )
         self.entry_properties = entry_properties
         self._include_name = self.EntryProperties.NAME in entry_properties
@@ -498,8 +474,7 @@ class Protocol(object):
 
         if not isinstance(allow_cyclic_links, bool):
             raise ValueError(
-                'allow_cyclic_link must be a boolean, '
-                'got {}'.format(allow_cyclic_links)
+                f"allow_cyclic_link must be a boolean, got {allow_cyclic_links}"
             )
         self.allow_cyclic_links = allow_cyclic_links
 
@@ -509,18 +484,14 @@ class Protocol(object):
 
         entries = dir_node.directories + dir_node.files
         entry_descriptors = [
-            self._get_entry_descriptor(
-                self._get_entry_properties(path, entry_hash)
-            ) for path, entry_hash in entries
+            self._get_entry_descriptor(self._get_entry_properties(path, entry_hash))
+            for path, entry_hash in entries
         ]
         return self._entry_descriptor_separator.join(sorted(entry_descriptors))
 
     @classmethod
     def _get_entry_descriptor(cls, entry_properties):
-        entry_strings = [
-            '{}:{}'.format(name, value)
-            for name, value in entry_properties
-        ]
+        entry_strings = [f"{name}:{value}" for name, value in entry_properties]
         return cls._entry_property_separator.join(sorted(entry_strings))
 
     def _get_entry_properties(self, path, entry_hash):
@@ -543,8 +514,8 @@ class Protocol(object):
         path_to_target = os.path.relpath(
             # the extra '.' is needed if link back to root, because
             # an empty path ('') is not supported by os.path.relpath
-            os.path.join('.', target_relpath),
-            os.path.join('.', relpath)
+            os.path.join(".", target_relpath),
+            os.path.join(".", relpath),
         )
         # TODO normalize posix!
         return path_to_target
@@ -562,15 +533,14 @@ def _get_hasher_factory(algorithm):
         return partial(hashlib.new, algorithm)
 
     try:  # bypass algorithm if already a hasher factory
-        hasher = algorithm(b'')
-        hasher.update(b'')
+        hasher = algorithm(b"")
+        hasher.update(b"")
         hasher.hexdigest()
         return algorithm
-    except:
+    except:  # noqa: E722
         pass
 
-    raise ValueError(
-        '`algorithm` must be one of: {}`'.format(algorithms_available))
+    raise ValueError(f"`algorithm` must be one of: {algorithms_available}`")
 
 
 def _parmap(func, iterable, jobs=1):
@@ -614,8 +584,8 @@ def _get_filehash(filepath, hasher_factory, chunk_size, cache=None):
         return filehash
 
     hasher = hasher_factory()
-    with open(filepath, 'rb') as f:
-        for chunk in iter(lambda: f.read(chunk_size), b''):
+    with open(filepath, "rb") as f:
+        for chunk in iter(lambda: f.read(chunk_size), b""):
             hasher.update(chunk)
 
     return hasher.hexdigest()
