@@ -127,11 +127,11 @@ def get_kwargs(args):
         dest="entry_properties",
         default=["data", "name"],
         help=(
-            "List of file/directory properties to include in the hash. "
-            f"Available properties are: {list(dirhash.Protocol.EntryProperties.options)} "
-            "and at least one of name and data must be included. "
-            "Default is [data name] which means that both the name/paths "
-            "and content (actual data) of files and directories will be included"
+            "List of file/directory properties to include in the hash. Available "
+            f"properties are: {list(dirhash.Protocol.EntryProperties.options)} and at "
+            "least one of name and data must be included. Default is [data name] which "
+            "means that both the name/paths and content (actual data) of files and "
+            "directories will be included"
         ),
         metavar="",
     )

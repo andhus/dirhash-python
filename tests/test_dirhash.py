@@ -429,7 +429,7 @@ class TestGetIncludedPaths(TempDirTest):
 
 def dirhash_mp_comp(*args, **kwargs):
     res = dirhash(*args, **kwargs)
-    res_mp = dirhash(jobs=2, *args, **kwargs)
+    res_mp = dirhash(*args, **{**kwargs, "jobs": 2})
     assert res == res_mp
     return res
 

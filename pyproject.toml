@@ -1,3 +1,17 @@
 [build-system]
 requires = ["setuptools", "versioneer==0.29"]
 build-backend = "setuptools.build_meta"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+
+[tool.ruff.lint.isort]
+known-local-folder = ["dirhash"]

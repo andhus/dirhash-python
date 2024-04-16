@@ -65,7 +65,7 @@ def time_shell(cmd, runs=1, repetitions=1, setup=None):
         time_cmd = f"{setup}; {time_cmd}"
 
     realtimes = []
-    for i in range(runs):
+    for _run in range(runs):
         process = subprocess.run(
             time_cmd, capture_output=True, text=True, shell=True, check=True
         )
@@ -77,10 +77,10 @@ def time_shell(cmd, runs=1, repetitions=1, setup=None):
             min_str, sec_str = t_str.split("m")
             sec = 60 * int(min_str) + float(sec_str[:-1])
             sec_per_rep = sec / repetitions
-        except:  # noqa: E722
+        except Exception as exc:
             raise RuntimeError(
                 f"Failed to parse `time` stderr output: {process.stderr}"
-            )
+            ) from exc
         realtimes.append(sec_per_rep)
 
     return realtimes
@@ -167,7 +167,7 @@ if __name__ == "__main__":
                 "t_median",
             ]
         ]
-        for (tc, alg), subdf in df.groupby(["test_case", "algorithm"]):
+        for (_tc, _alg), subdf in df.groupby(["test_case", "algorithm"]):
             t_ref = subdf[subdf["implementation"] == "shell reference"][
                 "t_median"
             ].values[0]
