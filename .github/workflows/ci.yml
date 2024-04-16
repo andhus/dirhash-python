@@ -1,4 +1,4 @@
-name: Run tests
+name: CI
 
 on:
   push:
@@ -12,6 +12,15 @@ on:
     types: [published, edited]
 
 jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+      - uses: pre-commit/action@v3.0.1
+
   tests:
     runs-on: ubuntu-latest
     strategy:
@@ -40,14 +49,6 @@ jobs:
           key: ${{ runner.os }}-${{ matrix.python-version }}-tox-${{ hashFiles('setup.py') }}-${{ hashFiles('setup.cfg') }} }}
       - name: Test with tox
         run: tox
-      - name: Commit and Push to Pull Request
-        if: matrix.python-version == 3.8
-        run: |
-          if [ -n "$(git status -s)" ]; then
-            git add .
-            git commit -m "✨ ⭐ Automated commit has been added to your pull request to fix formatting! ⭐ ✨"
-            git push origin ${{ github.head_ref }}
-          fi
       - uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
