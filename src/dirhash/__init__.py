@@ -147,7 +147,9 @@ def dirhash(
         linked_files=linked_files,
         empty_dirs=empty_dirs,
     )
-    protocol = Protocol(entry_properties=entry_properties, allow_cyclic_links=allow_cyclic_links)
+    protocol = Protocol(
+        entry_properties=entry_properties, allow_cyclic_links=allow_cyclic_links
+    )
     return dirhash_impl(
         directory=directory,
         algorithm=algorithm,
