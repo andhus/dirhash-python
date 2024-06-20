@@ -24,6 +24,7 @@ setup(
     author="Anders Huss",
     author_email="andhus@kth.se",
     license="MIT",
+    python_requires=">=3.8",
     install_requires=["scantree"],
     packages=find_packages("src"),
     package_dir={"": "src"},
