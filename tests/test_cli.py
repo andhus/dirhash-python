@@ -7,12 +7,18 @@ import pytest
 
 import dirhash
 
-console_script = os.path.join(os.path.dirname(sys.executable), "dirhash")
+console_script = os.path.join(
+    os.path.dirname(sys.executable),
+    "dirhash.exe" if os.name == "nt" else "dirhash",
+)
+if not os.path.isfile(console_script):
+    print(os.listdir(os.path.dirname(sys.executable)))
+    raise FileNotFoundError(f"Could not find console script at {console_script}.")
+if not os.access(console_script, os.X_OK):
+    raise PermissionError(f"Console script at {console_script} is not executable.")
 
 
 def dirhash_run(argstring, add_env=None):
-    assert os.path.isfile(console_script)
-    assert os.access(console_script, os.X_OK)
     if add_env:
         env = os.environ.copy()
         env.update(add_env)
