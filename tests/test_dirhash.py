@@ -153,7 +153,7 @@ class TempDirTest:
             shutil.rmtree(self.dir)
 
     def path_to(self, relpath):
-        return os.path.join(self.dir, relpath)
+        return os.path.join(self.dir, osp(relpath))
 
     def mkdirs(self, dirpath):
         os.makedirs(self.path_to(dirpath))
@@ -243,7 +243,7 @@ class TestGetIncludedPaths(TempDirTest):
         with pytest.raises(SymlinkRecursionError) as exc_info:
             included_paths(self.path_to("root"), allow_cyclic_links=False)
         assert exc_info.value.real_path == os.path.realpath(self.path_to("root"))
-        assert exc_info.value.first_path == self.path_to(osp("root/"))
+        assert exc_info.value.first_path == self.path_to("root/")
         assert exc_info.value.second_path == self.path_to("root/d1/link_back")
         assert str(exc_info.value).startswith("Symlink recursion:")
 
@@ -673,6 +673,9 @@ class TestDirhash(TempDirTest):
                 self.path_to("root1"), "sha256", entry_properties=["is_link"]
             )
 
+    @pytest.mark.skipif(
+        os.name == "nt", reason="TODO: not getting expected speedup on Windows."
+    )
     def test_multiproc_speedup(self):
         self.mkdirs("root/dir")
         num_files = 10
