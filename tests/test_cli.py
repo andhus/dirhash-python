@@ -28,6 +28,7 @@ def dirhash_run(argstring, add_env=None):
         [console_script] + shlex.split(argstring),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        text=True,
         env=env,
     )
     output, error = process.communicate()
