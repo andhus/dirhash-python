@@ -21,6 +21,17 @@ from dirhash import (
 )
 
 
+def osp(path: str) -> str:
+    """Normalize path for OS."""
+    if os.name == "nt":  # pragma: no cover
+        return path.replace("/", "\\")
+    return path
+
+
+def map_osp(paths):
+    return [osp(path) for path in paths]
+
+
 class TestGetHasherFactory:
     def test_get_guaranteed(self):
         algorithm_and_hasher_factory = [
@@ -142,7 +153,7 @@ class TempDirTest:
             shutil.rmtree(self.dir)
 
     def path_to(self, relpath):
-        return os.path.join(self.dir, relpath)
+        return os.path.join(self.dir, osp(relpath))
 
     def mkdirs(self, dirpath):
         os.makedirs(self.path_to(dirpath))
@@ -173,7 +184,7 @@ class TestGetIncludedPaths(TempDirTest):
         self.mkfile("root/d1/d11/f1")
         self.mkfile("root/d2/f1")
 
-        expected_filepaths = ["d1/d11/f1", "d1/f1", "d2/f1", "f1"]
+        expected_filepaths = map_osp(["d1/d11/f1", "d1/f1", "d2/f1", "f1"])
         filepaths = included_paths(self.path_to("root"))
         assert filepaths == expected_filepaths
 
@@ -220,11 +231,11 @@ class TestGetIncludedPaths(TempDirTest):
         assert filepaths == ["f1"]
 
         filepaths = included_paths(self.path_to("root"), linked_dirs=True)
-        assert filepaths == ["d1/f1", "d1/f2", "f1"]
+        assert filepaths == map_osp(["d1/f1", "d1/f2", "f1"])
 
         # default is 'linked_dirs': True
         filepaths = included_paths(self.path_to("root"))
-        assert filepaths == ["d1/f1", "d1/f2", "f1"]
+        assert filepaths == map_osp(["d1/f1", "d1/f2", "f1"])
 
     def test_cyclic_link(self):
         self.mkdirs("root/d1")
@@ -237,7 +248,7 @@ class TestGetIncludedPaths(TempDirTest):
         assert str(exc_info.value).startswith("Symlink recursion:")
 
         filepaths = included_paths(self.path_to("root"), allow_cyclic_links=True)
-        assert filepaths == ["d1/link_back/."]
+        assert filepaths == map_osp(["d1/link_back/."])
 
         # default is 'allow_cyclic_links': False
         with pytest.raises(SymlinkRecursionError):
@@ -255,11 +266,11 @@ class TestGetIncludedPaths(TempDirTest):
 
         # no ignore
         filepaths = included_paths(self.path_to("root"))
-        assert filepaths == [".d2/f1", ".f2", "d1/.f2", "d1/f1", "f1"]
+        assert filepaths == map_osp([".d2/f1", ".f2", "d1/.f2", "d1/f1", "f1"])
 
         # with ignore
         filepaths = included_paths(self.path_to("root"), match=["*", "!.*"])
-        assert filepaths == ["d1/f1", "f1"]
+        assert filepaths == map_osp(["d1/f1", "f1"])
 
     def test_ignore_hidden_files_only(self):
         self.mkdirs("root/d1")
@@ -273,13 +284,13 @@ class TestGetIncludedPaths(TempDirTest):
 
         # no ignore
         filepaths = included_paths(self.path_to("root"))
-        assert filepaths == [".d2/f1", ".f2", "d1/.f2", "d1/f1", "f1"]
+        assert filepaths == map_osp([".d2/f1", ".f2", "d1/.f2", "d1/f1", "f1"])
 
         # with ignore
         filepaths = included_paths(
             self.path_to("root"), match=["**/*", "!**/.*", "**/.*/*", "!**/.*/.*"]
         )
-        assert filepaths == [".d2/f1", "d1/f1", "f1"]
+        assert filepaths == map_osp([".d2/f1", "d1/f1", "f1"])
 
     def test_ignore_hidden_explicitly_recursive(self):
         self.mkdirs("root/d1")
@@ -293,11 +304,11 @@ class TestGetIncludedPaths(TempDirTest):
 
         # no ignore
         filepaths = included_paths(self.path_to("root"))
-        assert filepaths == [".d2/f1", ".f2", "d1/.f2", "d1/f1", "f1"]
+        assert filepaths == map_osp([".d2/f1", ".f2", "d1/.f2", "d1/f1", "f1"])
 
         # with ignore
         filepaths = included_paths(self.path_to("root"), match=["*", "!**/.*"])
-        assert filepaths == ["d1/f1", "f1"]
+        assert filepaths == map_osp(["d1/f1", "f1"])
 
     def test_exclude_hidden_dirs(self):
         self.mkdirs("root/d1")
@@ -312,11 +323,13 @@ class TestGetIncludedPaths(TempDirTest):
 
         # no ignore
         filepaths = included_paths(self.path_to("root"), empty_dirs=True)
-        assert filepaths == [".d2/f1", ".f2", "d1/.d1/.", "d1/.f2", "d1/f1", "f1"]
+        assert filepaths == map_osp(
+            [".d2/f1", ".f2", "d1/.d1/.", "d1/.f2", "d1/f1", "f1"]
+        )
 
         # with ignore
         filepaths = included_paths(self.path_to("root"), match=["*", "!.*/"])
-        assert filepaths == [".f2", "d1/.f2", "d1/f1", "f1"]
+        assert filepaths == map_osp([".f2", "d1/.f2", "d1/f1", "f1"])
 
     def test_exclude_hidden_dirs_and_files(self):
         self.mkdirs("root/d1")
@@ -330,11 +343,11 @@ class TestGetIncludedPaths(TempDirTest):
 
         # no ignore
         filepaths = included_paths(self.path_to("root"))
-        assert filepaths == [".d2/f1", ".f2", "d1/.f2", "d1/f1", "f1"]
+        assert filepaths == map_osp([".d2/f1", ".f2", "d1/.f2", "d1/f1", "f1"])
 
         # using ignore
         filepaths = included_paths(self.path_to("root"), match=["*", "!.*/", "!.*"])
-        assert filepaths == ["d1/f1", "f1"]
+        assert filepaths == map_osp(["d1/f1", "f1"])
 
     def test_exclude_extensions(self):
         self.mkdirs("root/d1")
@@ -353,14 +366,16 @@ class TestGetIncludedPaths(TempDirTest):
         filepaths = included_paths(
             self.path_to("root"), match=["*", "!*.skip1", "!*.skip2"]
         )
-        assert filepaths == [
-            "d1/f.txt",
-            "f",
-            "f.skip1.txt",
-            "f.skip1skip2",
-            "f.txt",
-            "fskip1",
-        ]
+        assert filepaths == map_osp(
+            [
+                "d1/f.txt",
+                "f",
+                "f.skip1.txt",
+                "f.skip1skip2",
+                "f.txt",
+                "fskip1",
+            ]
+        )
 
     def test_empty_dirs_include_vs_exclude(self):
         self.mkdirs("root/d1")
@@ -372,14 +387,14 @@ class TestGetIncludedPaths(TempDirTest):
         self.mkfile("root/d3/d31/f")
 
         filepaths = included_paths(self.path_to("root"), empty_dirs=False)
-        assert filepaths == ["d1/f", "d3/d31/f"]
+        assert filepaths == map_osp(["d1/f", "d3/d31/f"])
 
         # `include_empty=False` is default
         filepaths = included_paths(self.path_to("root"))
-        assert filepaths == ["d1/f", "d3/d31/f"]
+        assert filepaths == map_osp(["d1/f", "d3/d31/f"])
 
         filepaths = included_paths(self.path_to("root"), empty_dirs=True)
-        assert filepaths == ["d1/f", "d2/.", "d3/d31/f", "d4/d41/."]
+        assert filepaths == map_osp(["d1/f", "d2/.", "d3/d31/f", "d4/d41/."])
 
     def test_empty_dirs_because_of_filter_include_vs_exclude(self):
         self.mkdirs("root/d1")
@@ -391,19 +406,19 @@ class TestGetIncludedPaths(TempDirTest):
         filepaths = included_paths(
             self.path_to("root"), match=["*", "!.*"], empty_dirs=False
         )
-        assert filepaths == ["d1/f"]
+        assert filepaths == map_osp(["d1/f"])
 
         # `include_empty=False` is default
         filepaths = included_paths(
             self.path_to("root"),
             match=["*", "!.*"],
         )
-        assert filepaths == ["d1/f"]
+        assert filepaths == map_osp(["d1/f"])
 
         filepaths = included_paths(
             self.path_to("root"), match=["*", "!.*"], empty_dirs=True
         )
-        assert filepaths == ["d1/f", "d2/."]
+        assert filepaths == map_osp(["d1/f", "d2/."])
 
     def test_empty_dir_inclusion_not_affected_by_match(self):
         self.mkdirs("root/d1")
@@ -414,17 +429,17 @@ class TestGetIncludedPaths(TempDirTest):
         filepaths = included_paths(
             self.path_to("root"), match=["*", "!.*"], empty_dirs=True
         )
-        assert filepaths == [".d2/.", "d1/."]
+        assert filepaths == map_osp([".d2/.", "d1/."])
 
         filepaths = included_paths(
             self.path_to("root"), match=["*", "!.*/"], empty_dirs=True
         )
-        assert filepaths == [".d2/.", "d1/."]
+        assert filepaths == map_osp([".d2/.", "d1/."])
 
         filepaths = included_paths(
             self.path_to("root"), match=["*", "!d1"], empty_dirs=True
         )
-        assert filepaths == [".d2/.", "d1/."]
+        assert filepaths == map_osp([".d2/.", "d1/."])
 
 
 def dirhash_mp_comp(*args, **kwargs):
@@ -658,6 +673,11 @@ class TestDirhash(TempDirTest):
                 self.path_to("root1"), "sha256", entry_properties=["is_link"]
             )
 
+    @pytest.mark.skipif(
+        os.name == "nt",
+        reason="TODO: not getting expected speedup on Windows.",
+        # TODO: see https://github.com/andhus/scantree/issues/25
+    )
     def test_multiproc_speedup(self):
         self.mkdirs("root/dir")
         num_files = 10
@@ -704,7 +724,7 @@ class TestDirhash(TempDirTest):
         target_file = tmpdir.join("target_file")
         target_file.ensure()
         for i in range(num_links):
-            root2.join(f"link_{i}").mksymlinkto(target_file)
+            os.symlink(target_file, root2.join(f"link_{i}"))
 
         overhead_margin_factor = 1.5
         expected_max_elapsed_with_links = overhead * overhead_margin_factor + wait_time
@@ -743,7 +763,7 @@ class TestDirhash(TempDirTest):
             target_file = tmpdir.join(target_file_name)
             target_file.write("< one chunk content", ensure=True)
             for j in range(num_links_per_file):
-                root2.join(f"link_{i}_{j}").mksymlinkto(target_file)
+                os.symlink(target_file, root2.join(f"link_{i}_{j}"))
 
         overhead_margin_factor = 1.5
         expected_max_elapsed_with_links = (

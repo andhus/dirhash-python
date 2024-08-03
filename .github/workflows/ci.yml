@@ -22,11 +22,12 @@ jobs:
       - uses: pre-commit/action@v3.0.1
 
   tests:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        os: [ubuntu-latest, windows-latest]
 
     steps:
       - uses: actions/checkout@v4
@@ -50,6 +51,7 @@ jobs:
       - name: Test with tox
         run: tox
       - uses: codecov/codecov-action@v4
+        if: matrix.python-version == '3.8' && matrix.os == 'ubuntu-latest'
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
