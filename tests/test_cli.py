@@ -65,6 +65,13 @@ def create_default_tree(tmpdir):
     tmpdir.join("file.ext2").write("file with extension .ext2")
 
 
+def osp(path: str) -> str:
+    """Normalize path for OS"""
+    if os.name == "nt":  # pragma: no cover
+        return path.replace("/", "\\")
+    return path
+
+
 class TestCLI:
     @pytest.mark.parametrize(
         "argstring, non_default_kwargs",
@@ -177,7 +184,7 @@ class TestCLI:
                 o, error, returncode = dirhash_run(argstring)
                 assert returncode == 0
                 assert error == ""
-                assert o == output
+                assert o == osp(output)
 
     @pytest.mark.parametrize(
         "argstring, kwargs, expected_hashes",
