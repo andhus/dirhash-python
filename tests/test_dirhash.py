@@ -674,7 +674,9 @@ class TestDirhash(TempDirTest):
             )
 
     @pytest.mark.skipif(
-        os.name == "nt", reason="TODO: not getting expected speedup on Windows."
+        os.name == "nt",
+        reason="TODO: not getting expected speedup on Windows.",
+        # TODO: see https://github.com/andhus/scantree/issues/25
     )
     def test_multiproc_speedup(self):
         self.mkdirs("root/dir")
