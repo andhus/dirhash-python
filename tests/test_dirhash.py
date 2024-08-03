@@ -243,7 +243,7 @@ class TestGetIncludedPaths(TempDirTest):
         with pytest.raises(SymlinkRecursionError) as exc_info:
             included_paths(self.path_to("root"), allow_cyclic_links=False)
         assert exc_info.value.real_path == os.path.realpath(self.path_to("root"))
-        assert exc_info.value.first_path == self.path_to("root/")
+        assert exc_info.value.first_path == self.path_to(osp("root/"))
         assert exc_info.value.second_path == self.path_to("root/d1/link_back")
         assert str(exc_info.value).startswith("Symlink recursion:")
 
@@ -719,7 +719,7 @@ class TestDirhash(TempDirTest):
         target_file = tmpdir.join("target_file")
         target_file.ensure()
         for i in range(num_links):
-            root2.join(f"link_{i}").mksymlinkto(target_file)
+            os.symlink(target_file, root2.join(f"link_{i}"))
 
         overhead_margin_factor = 1.5
         expected_max_elapsed_with_links = overhead * overhead_margin_factor + wait_time
@@ -758,7 +758,7 @@ class TestDirhash(TempDirTest):
             target_file = tmpdir.join(target_file_name)
             target_file.write("< one chunk content", ensure=True)
             for j in range(num_links_per_file):
-                root2.join(f"link_{i}_{j}").mksymlinkto(target_file)
+                os.symlink(target_file, root2.join(f"link_{i}_{j}"))
 
         overhead_margin_factor = 1.5
         expected_max_elapsed_with_links = (

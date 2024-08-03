@@ -67,7 +67,7 @@ def create_default_tree(tmpdir):
 
 
 def osp(path: str) -> str:
-    """Normalize path for OS"""
+    """Normalize path for OS."""
     if os.name == "nt":  # pragma: no cover
         return path.replace("/", "\\")
     return path
