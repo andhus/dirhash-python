@@ -11,3 +11,15 @@ repos:
         args:
           - --fix
       - id: ruff-format
+  - repo: https://github.com/tox-dev/tox-ini-fmt
+    rev: 1.7.2
+    hooks:
+      - id: tox-ini-fmt
+  - repo: https://github.com/google/yamlfmt
+    rev: v0.21.0
+    hooks:
+      - id: yamlfmt
+  - repo: https://github.com/tox-dev/pyproject-fmt
+    rev: v2.25.3
+    hooks:
+      - id: pyproject-fmt

@@ -1,4 +1,0 @@
-[run]
-branch = True
-source = dirhash
-omit = _version.py

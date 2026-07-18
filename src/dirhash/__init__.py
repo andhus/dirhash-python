@@ -9,6 +9,7 @@ from multiprocessing import Pool
 from scantree import CyclicLinkedDir, RecursionFilter, scantree
 
 from . import _version
+from .hasher import FactoryHasher, new
 
 __version__ = _version.get_versions()["version"]
 
@@ -526,21 +527,13 @@ def _get_hasher_factory(algorithm):
     name. Bypasses input argument `algorithm` if it is already a hasher factory
     (verified by attempting calls to required methods).
     """
-    if algorithm in algorithms_guaranteed:
-        return getattr(hashlib, algorithm)
 
-    if algorithm in algorithms_available:
-        return partial(hashlib.new, algorithm)
-
-    try:  # bypass algorithm if already a hasher factory
-        hasher = algorithm(b"")
-        hasher.update(b"")
-        hasher.hexdigest()
+    if isinstance(algorithm, FactoryHasher) or (
+        callable(algorithm) and isinstance(algorithm(), FactoryHasher)
+    ):
         return algorithm
-    except:  # noqa: E722
-        pass
 
-    raise ValueError(f"`algorithm` must be one of: {algorithms_available}`")
+    return new(algorithm)
 
 
 def _parmap(func, iterable, jobs=1):

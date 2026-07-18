@@ -1,5 +1,6 @@
 import hashlib
 import os
+import pickle
 import shutil
 import tempfile
 from time import sleep, time
@@ -33,36 +34,38 @@ def map_osp(paths):
 
 
 class TestGetHasherFactory:
-    def test_get_guaranteed(self):
-        algorithm_and_hasher_factory = [
-            ("md5", hashlib.md5),
-            ("sha1", hashlib.sha1),
-            ("sha224", hashlib.sha224),
-            ("sha256", hashlib.sha256),
-            ("sha384", hashlib.sha384),
-            ("sha512", hashlib.sha512),
-        ]
-        assert algorithms_guaranteed == {a for a, _ in algorithm_and_hasher_factory}
-        for algorithm, expected_hasher_factory in algorithm_and_hasher_factory:
-            hasher_factory = _get_hasher_factory(algorithm)
-            assert hasher_factory == expected_hasher_factory
+    @pytest.mark.parametrize("algorithm", algorithms_guaranteed)
+    def test_get_guaranteed(self, algorithm):
+        expected_hasher_factory = getattr(hashlib, algorithm)()
 
-    def test_get_available(self):
-        for algorithm in algorithms_available:
-            hasher_factory = _get_hasher_factory(algorithm)
-            try:
-                hasher = hasher_factory()
-            except ValueError as exc:
-                # Some "available" algorithms are not necessarily available
-                # (fails for e.g. 'ripemd160' in github actions for python 3.8).
-                # See: https://stackoverflow.com/questions/72409563/unsupported-hash-type-ripemd160-with-hashlib-in-python  # noqa: E501
-                print(f"Failed to create hasher for {algorithm}: {exc}")
-                assert exc.args[0] == f"unsupported hash type {algorithm}"
-                hasher = None
+        hasher_factory = _get_hasher_factory(algorithm)
+        assert hasher_factory.hash.name == expected_hasher_factory.name
 
-            if hasher is not None:
-                assert hasattr(hasher, "update")
-                assert hasattr(hasher, "hexdigest")
+    @pytest.mark.parametrize("algorithm", algorithms_available)
+    def test_get_available(self, algorithm):
+        hasher_factory = _get_hasher_factory(algorithm)
+        try:
+            hasher = hasher_factory()
+        except ValueError as exc:
+            # Some "available" algorithms are not necessarily available
+            # (fails for e.g. 'ripemd160' in github actions for python 3.8).
+            # See: https://stackoverflow.com/questions/72409563/unsupported-hash-type-ripemd160-with-hashlib-in-python  # noqa: E501
+            print(f"Failed to create hasher for {algorithm}: {exc}")
+            assert exc.args[0] == f"unsupported hash type {algorithm}"
+            hasher = None
+
+        if hasher is not None:
+            assert hasattr(hasher, "update")
+            assert hasattr(hasher, "hexdigest")
+
+    @pytest.mark.parametrize(
+        "algorithm", sorted(algorithms_guaranteed | algorithms_available)
+    )
+    def test_hasher_pickleable(self, algorithm):
+        hasher_factory = _get_hasher_factory(algorithm)
+
+        unpickled = pickle.loads(pickle.dumps(hasher_factory))
+        assert unpickled(b"data").hexdigest() == hasher_factory(b"data").hexdigest()
 
     def test_not_available(self):
         with pytest.raises(ValueError):
@@ -164,7 +167,11 @@ class TempDirTest:
                 f.write(content)
 
     def symlink(self, src, dst):
-        os.symlink(self.path_to(src), self.path_to(dst))
+        try:
+            os.symlink(self.path_to(src), self.path_to(dst))
+        except OSError:
+            if os.name == "nt":
+                pytest.xfail("Windows may lack symlink privilege.")
 
     def remove(self, relpath):
         if os.path.isdir(self.path_to(relpath)):
@@ -699,6 +706,11 @@ class TestDirhash(TempDirTest):
         assert elapsed_muliproc < 0.9 * expected_min_elapsed_sequential
         # just check "any speedup", the overhead varies (and is high on Travis)
 
+    @pytest.mark.xfail(
+        os.name == "nt",
+        raises=OSError,
+        reason="Windows may lack symlink privilege.",
+    )
     def test_cache_by_real_path_speedup(self, tmpdir):
         num_links = 10
 
@@ -735,6 +747,11 @@ class TestDirhash(TempDirTest):
         elapsed_with_links = end - start
         assert elapsed_with_links < expected_max_elapsed_with_links
 
+    @pytest.mark.xfail(
+        os.name == "nt",
+        raises=OSError,
+        reason="Windows may lack symlink privilege.",
+    )
     def test_cache_together_with_multiprocess_speedup(self, tmpdir):
         target_file_names = ["target_file_1", "target_file_2"]
         num_links_per_file = 10
@@ -848,3 +865,16 @@ def mock_func(x):
 def test_parmap(jobs):
     inputs = [1, 2, 3, 4]
     assert _parmap(mock_func, inputs, jobs=jobs) == [2, 4, 6, 8]
+
+
+@pytest.mark.parametrize(
+    "algorithm", sorted(algorithms_guaranteed | algorithms_available)
+)
+@pytest.mark.parametrize("jobs", [1, 2])
+def test_parmap_hasher(jobs, algorithm):
+    hasher_factory = _get_hasher_factory(algorithm)
+    dataset = [b"", b"data"]
+    result = _parmap(hasher_factory, dataset, jobs=jobs)
+
+    assert len(result) == len(dataset)
+    assert all(hasattr(hash, "hexdigest") for hash in result)
